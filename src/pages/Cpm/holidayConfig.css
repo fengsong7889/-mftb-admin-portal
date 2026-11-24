@@ -6,7 +6,7 @@
  * 完整许可条款见仓库根目录 LICENSE 文件。
  */
 
-/* ==================== 頁面頭部（全局新增/表单页规范） ==================== */
+/* ==================== 頁面頭部（独立菜单页：无返回按钮） ==================== */
 
 .hc-pagehead {
   position: relative;
@@ -36,21 +36,6 @@
   gap: 16px;
   min-width: 0;
 }
-.hc-back.ant-btn {
-  border-radius: 8px;
-  height: 36px;
-  padding: 0 16px;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  box-shadow: var(--shadow-brand);
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-}
-.hc-pagehead__divider {
-  width: 1px;
-  height: 20px;
-  background: var(--border-3);
-}
 .hc-pagehead h2 {
   margin: 0;
   font-size: 18px;
@@ -61,9 +46,27 @@
   font-size: 12px;
   color: var(--text-3);
 }
-.hc-pagehead__years {
+/* ==================== 查询区（年度筛选） ==================== */
+
+/* 与全局 .search-section 同一块面：不另开卡片背景，只把控件排成一行 */
+.search-section.hc-search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.hc-search__label {
+  font-size: 13px;
+  color: var(--text-2);
+  flex: none;
+}
+.hc-search__years {
   display: flex;
   gap: 6px;
+}
+.hc-search__hint {
+  font-size: 12px;
+  color: var(--text-3);
 }
 
 /* ==================== 統計與圖例 ==================== */

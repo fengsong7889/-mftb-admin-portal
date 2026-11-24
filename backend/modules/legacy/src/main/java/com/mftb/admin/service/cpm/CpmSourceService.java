@@ -47,6 +47,8 @@ public class CpmSourceService {
     /** 挑选器一屏够用即可，且 RDM 实现侧还会再夹一次上限 */
     private static final int CANDIDATE_LIMIT = 30;
     private static final DateTimeFormatter DATE = DateTimeFormatter.ISO_LOCAL_DATE;
+    /** 会议起止给到界面的精度：分钟足够（导入后落的是计划起止日，时间只供阅读） */
+    private static final DateTimeFormatter DATE_TIME = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm");
 
     private final ObjectProvider<RdmWorkItemSource> rdmSource;
     private final MeetingActionSource meetingActions;
@@ -157,6 +159,46 @@ public class CpmSourceService {
             vo.setDueDate(ref.dueDate() == null ? null : ref.dueDate().format(DATE));
             vo.setSubtitle(ref.meetingTitle());
             vo.setImported(imported.contains(vo.getSourceRef()));
+            out.add(vo);
+        }
+        return out;
+    }
+
+    /* ==================== 会议本体（導入會議） ==================== */
+
+    /**
+     * 本人组织或参与的未取消会议，供台账「導入會議」挑选。
+     *
+     * <p>与行动项档是两个接而不是一个 tab 两种行：行动项带回来的是一个「完成时限」（单日），
+     * 会议本体带回来的是一段「预定起止」（计划起 + 计划止）。合成一档，界面就无法在同一个
+     * 日期列里同时说清两种语义；导入后用户看到的两个日期与他刚才选的东西对不上。
+     *
+     * <p>「哪些会与我相关」与「哪些会不算已取消」全部在会议域端口里定，这里只翻译形状：
+     * cpm 不查 biz_meeting_booking 的列，会议改表时最多「少几行」，不会静默错判归属。
+     */
+    public List<CpmDto.MeetingSourceVO> listMeetings(String keyword) {
+        SysUser current = guard.currentUser();
+        List<MeetingActionSource.MeetingRef> refs =
+                meetingActions.findUncancelledMeetingsOf(current.getId(), keyword, CANDIDATE_LIMIT);
+        if (refs.isEmpty()) {
+            return List.of();
+        }
+        Set<String> imported = importedRefs(CpmConstants.SOURCE_MEETING, current.getId(),
+                refs.stream().map(ref -> String.valueOf(ref.bookingId())).toList());
+
+        List<CpmDto.MeetingSourceVO> out = new ArrayList<>();
+        for (MeetingActionSource.MeetingRef ref : refs) {
+            CpmDto.MeetingSourceVO vo = new CpmDto.MeetingSourceVO();
+            vo.setBookingId(ref.bookingId());
+            vo.setBookingNo(ref.bookingNo());
+            vo.setTitle(ref.title());
+            // 起止直接原样透出 ISO 白日期时间：日期语义不在这层丢失，也不先折成日期再让人猜时间
+            vo.setStartTime(ref.startTime() == null ? null : ref.startTime().format(DATE_TIME));
+            vo.setEndTime(ref.endTime() == null ? null : ref.endTime().format(DATE_TIME));
+            vo.setStatusCode(ref.statusCode());
+            vo.setRole(ref.organizer() ? "organizer" : "participant");
+            vo.setRoomName(ref.roomName());
+            vo.setImported(imported.contains(String.valueOf(ref.bookingId())));
             out.add(vo);
         }
         return out;

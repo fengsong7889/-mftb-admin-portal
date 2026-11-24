@@ -17441,7 +17441,7 @@
     "sourceImport": {
       "title": "關聯業務對象導入",
       "button": "關聯導入",
-      "tip": "一鍵帶入本人的需求與會議行動項",
+      "tip": "一鍵帶入本人的需求、任務、會議本體與會議行動項",
       "tabRdm": "產研需求",
       "tabMeeting": "會議行動項",
       "search": "依需求標題或編號搜索",
@@ -17464,7 +17464,8 @@
       "searchTask": "依任務標題或任務號搜索",
       "syncHint": "開啟後本條目的進度更新會回寫 RDM 任務；RDM 的規則仍會攔截不合法上報",
       "syncLabel": "回寫",
-      "tabRdmTask": "產研任務"
+      "tabRdmTask": "產研任務",
+      "tabMeetingBooking": "會議本體"
     },
     "sourceRole": {
       "submitter": "我提出的",
@@ -17771,7 +17772,8 @@
       "saved": "已記錄",
       "title": "記時（{{date}}）",
       "todayTotal": "今天合計 {{minutes}}",
-      "tooltip": "今天已記 {{minutes}}"
+      "tooltip": "今天已記 {{minutes}}",
+      "loading": "時段載入中…"
     },
     "worklog": {
       "detailEllipsis": "詳情…",
@@ -17800,7 +17802,10 @@
         "ganttSwitchTip": "開啟顯示甘特圖，關閉切換為列表",
         "list": "列表",
         "showWeekends": "顯示周末",
-        "today": "回到今天"
+        "today": "回到今天",
+        "ai": "AI 助手",
+        "aiTip": "把流水帳粘進來，系統拆成子任務草稿供你勾選",
+        "meetingTip": "導入我組織或我參與的未取消會議，計劃起止取會議起止時間"
       },
       "badge": {
         "leave": "請",
@@ -17825,7 +17830,9 @@
         "note": "備註原因",
         "progress": "當前進度",
         "start": "開始日期",
-        "task": "任務子項"
+        "task": "任務子項",
+        "progressEnd": "進度（{{name}}期末）",
+        "progressEndTip": "顯示該查詢周期期末的落定值；期內無更新沿用期前最後一筆，從未更新為 0%。點擊行內進度可更新最新值。"
       },
       "confirm": {
         "deleteItemTitle": "確定刪除整個工作項？",
@@ -17878,8 +17885,23 @@
         "pdfDone": "已下載當前台账的 A4 分頁 PDF"
       },
       "hours": {
-        "tip": "{{days}} 個工作日 × {{hours}}h（周末/節假日不計）",
-        "value": "{{hours}}小時"
+        "tip": "{{days}} 個工作日 × {{hours}}h = {{hours}}h（週末/節假日不計）· 點擊可手工填寫",
+        "value": "{{hours}}小時",
+        "current": "當前 {{hours}} 小時",
+        "hint": "正常口徑：{{days}} 個工作日 × {{hours}}h = {{auto}}h；加班上限 {{cap}}h（× {{perDay}}h）。週末與節假日不計。",
+        "manualTip": "已手工填寫·點擊可修改",
+        "modeAuto": "工作日自動",
+        "modeManual": "手工填寫",
+        "reset": "恢復自動（{{days}} 工作日 × 8h = {{hours}}h）",
+        "save": "保存",
+        "unit": "小時",
+        "unscheduled": "未排期",
+        "hintUnscheduled": "尚未排期，暫按一個工作日計上限 {{cap}}h；排期後會自動收斂。",
+        "over": "最多 {{cap}}h（{{days}} 個工作日 × {{perDay}}h）；要填更多請先拉長排期。",
+        "overtimeBadge": "加班 {{overtime}}h·不計入正常工時口徑",
+        "overtimeTip": "正常 {{normal}}h（{{days}} 個工作日 × {{hours}}h）＋加班 {{overtime}}h",
+        "split": "正常 {{normal}}h + 加班 {{overtime}}h = 合計 {{total}}h（{{days}} 個工作日 × {{hours}}h）",
+        "splitNormal": "未超正常口徑：{{normal}}h（本期正常額度 {{days}} 個工作日 = {{auto}}h），無加班"
       },
       "inline": {
         "clickToEdit": "點擊修改"
@@ -17982,12 +18004,15 @@
         "pendingNow": "待完成",
         "pendingNowTip": "當前狀態為待處理/待排期",
         "pendingStart": "待啟動",
-        "pendingTip": "期末進度 0%"
+        "pendingTip": "期末進度 0%",
+        "hoursSplitTip": "正常 {{normal}}h ＋ 加班 {{overtime}}h；加班不另存列，由合計減工作日 × 8h 派生",
+        "hoursWithOt": "總耗時·含加班 {{overtime}}h"
       },
       "status": {
         "deriveTip": "由進度自動判定：100% 已完成；1–99% 進行中；0% 待處理；未排期為待排期",
         "plan": "待排期",
-        "todo": "待處理"
+        "todo": "待處理",
+        "cancelledTip": "來源會議已取消：安排保留作為事實，但不再計入待完成與工時"
       },
       "subtaskN": "子任務 {{count}}",
       "suffix": {
@@ -17995,7 +18020,8 @@
         "percent": "%"
       },
       "tabbar": {
-        "summary": "{{tasks}} 個子任務 · {{workdays}} 個工作日"
+        "summary": "{{tasks}} 個子任務 · {{workdays}} 個工作日",
+        "cancelled": " · {{count}} 項已取消（不計工時）"
       },
       "undo": "撤銷",
       "weekNth": "第{{count}}週",
@@ -18010,7 +18036,8 @@
       ],
       "import": {
         "button": "導入本地台账",
-        "done": "已導入本地台账（{{count}} 個工作項）"
+        "done": "已導入本地台账（{{count}} 個工作項）",
+        "tip": "把這台瀏覽器裡記的舊台账一次性搬進服務端"
       },
       "loadFailed": "台账載入失敗",
       "loading": "台账加載中…",
@@ -18018,6 +18045,27 @@
       "tab": {
         "day": "日视图",
         "ledger": "工作台账"
+      },
+      "category": {
+        "general": "通用"
+      },
+      "progress": {
+        "historyDelta": "較上期 {{value}}%",
+        "historyNow": "當前已改至 {{value}}%，尚未保存為新一期記錄",
+        "historyTitle": "逐週進度",
+        "noHistory": "尚無進度更新記錄",
+        "thisWeek": "本週",
+        "week": "第 {{week}} 週",
+        "latest": "最新進度",
+        "live": "目前最新",
+        "review": "往期快照",
+        "reviewNote": "該期已結束，僅供回溯；提交只記錄到今天。",
+        "tipFuture": "尚未到該期末，顯示當前值",
+        "tipLegacy": "無流水，取當前值",
+        "tipLive": "當前真實進度 · 點擊更新",
+        "tipNotStarted": "該期尚未開始（0%）· 點擊更新最新",
+        "tipPeriod": "{{label}}期末快照 · 點擊更新最新進度",
+        "tipStale": "本期無更新，沿用期前最後一筆 · 點擊更新最新"
       }
     },
     "holiday": {
@@ -18067,7 +18115,9 @@
       "workday": "工作日",
       "workdaysYear": "全年工作日",
       "loadFailed": "日曆載入失敗",
-      "refreshStatutory": "同步系統法定假日"
+      "refreshStatutory": "同步系統法定假日",
+      "searchHint": "切換年度只看該年的口徑與登記明細",
+      "searchYear": "年度"
     },
     "workReport": {
       "anchor": "錨點日期",
@@ -18141,7 +18191,10 @@
         "contentRow": "- {{task}}{{inserted}} — {{from}}% → {{to}}% · {{hours}}h · {{status}}",
         "insertedMark": "［臨時插入］",
         "noContent": "- 本期無已排期的工作項任務",
-        "backlogItem": "- [待排期] {{count}} 項未排期任務不計工時"
+        "backlogItem": "- [待排期] {{count}} 項未排期任務不計工時",
+        "groupTitleOt": "### {{title}}（{{count}} 項 · {{hours}}h，含加班 {{overtime}}h）",
+        "overtime": "- 其中加班 {{overtime}}h（正常 {{normal}}h）",
+        "overtimeMark": "（含加班 {{overtime}}h）"
       },
       "outputs": {
         "none": "本期無完成事項——進行中的推進見下節。"
@@ -18153,7 +18206,8 @@
         "inserted": "臨時插入 {{count}} 項",
         "progress": "平均進度 {{from}}% → {{to}}%（{{delta}}%）",
         "risks": "{{count}} 項逾期需關注",
-        "sep": "，"
+        "sep": "，",
+        "overtime": "含加班 {{overtime}}h（正常 {{normal}}h）"
       },
       "overdueDays": "逾期 {{days}} 天",
       "overdueShort": "逾期 {{days}}d",
@@ -18182,7 +18236,9 @@
       "stat": {
         "avgEnd": "期末平均進度",
         "hours": "投入工時",
-        "risks": "風險事項"
+        "risks": "風險事項",
+        "overtime": "含加班 {{overtime}}h",
+        "overtimeTip": "正常 {{normal}}h ＋ 加班 {{overtime}}h；加班由服務端按交集工作日派生，不另存字段"
       },
       "summaryPlaceholder": "寫一句本期總結（留空則用自動概述，導出同文）",
       "tab": {
@@ -18195,7 +18251,28 @@
       "title": "工作匯報",
       "covered": "本期覆蓋",
       "loadFailed": "匯報載入失敗",
-      "loading": "匯報聚合中…"
+      "loading": "匯報聚合中…",
+      "groupOvertime": "含加班 {{overtime}}h"
+    },
+    "meetingImport": {
+      "button": "導入會議",
+      "close": "關閉",
+      "dayFormat": "MM-DD HH:mm",
+      "empty": "目前沒有可導入的會議",
+      "endTimeFormat": "HH:mm",
+      "hint": "只列出我組織或我參與的未取消會議；導入時自動帶成該會議預定起止日期的計劃任務，導入後可修改。會議後續被取消，對應任務會自動標為已取消。",
+      "import": "導入",
+      "importTip": "帶入為台账子任務，計劃起止取會議起止時間",
+      "importedTip": "這場會議已導入過，重複導入會被拒絕",
+      "importedToast": "已導入為工作記錄，計劃起止取會議起止時間",
+      "loadError": "會議清單載入失敗",
+      "roleOrganizer": "我組織",
+      "roleParticipant": "我參會",
+      "search": "依會議標題或編號搜尋",
+      "statusBooked": "已預訂",
+      "statusCheckedIn": "已開始",
+      "statusFinished": "已結束",
+      "title": "導入會議"
     }
   }
 }

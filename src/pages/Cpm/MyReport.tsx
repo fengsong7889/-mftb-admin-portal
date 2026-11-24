@@ -251,7 +251,15 @@ export default function MyReport() {
                         <RpStat label={t('cpm.status.doing', { defaultValue: '進行中' })} value={report.totals.inProgress} suffix={t('cpm.gantt.suffix.item', { defaultValue: ' 項' })} color="var(--info)" bg="var(--info-soft)" icon={<RiseOutlined />} />
                         <RpStat label={t('cpm.workReport.stat.avgEnd', { defaultValue: '期末平均進度' })} value={report.totals.avgEnd} suffix="%" color="var(--brand)" bg="var(--brand-soft)" icon={<FieldTimeOutlined />}
                           extra={<DeltaChip delta={delta} />} />
-                        <RpStat label={t('cpm.workReport.stat.hours', { defaultValue: '投入工時' })} value={report.totals.hours} suffix=" h" color="var(--purple)" bg="var(--purple-soft)" icon={<FieldTimeOutlined />} />
+                        <RpStat label={t('cpm.workReport.stat.hours', { defaultValue: '投入工時' })} value={report.totals.hours} suffix=" h" color="var(--purple)" bg="var(--purple-soft)" icon={<FieldTimeOutlined />}
+                          extra={report.totals.overtimeHours > 0 && (
+                            <Tooltip title={t('cpm.workReport.stat.overtimeTip', {
+                              normal: report.totals.hours - report.totals.overtimeHours, overtime: report.totals.overtimeHours,
+                              defaultValue: '正常 {{normal}}h ＋ 加班 {{overtime}}h；加班由服务端按交集工作日派生，不另存字段',
+                            })}>
+                              <span className="rp-ot">{t('cpm.workReport.stat.overtime', { overtime: report.totals.overtimeHours, defaultValue: '含加班 {{overtime}}h' })}</span>
+                            </Tooltip>
+                          )} />
                       </div>
                       {/* 风险与临时插入不再各占一节，缩成概览行内标记：读的人先看到量，再去看明细 */}
                       <div className="rp-flags">
@@ -409,6 +417,11 @@ function GroupBlock({ g }: { g: ReportGroupRow }) {
         <i className="rp-cmp__dot" />
         <b>{g.group.title}</b>
         <span>{t('cpm.workReport.groupMeta', { count: g.rows.length, hours: g.hours, done: g.doneCount, defaultValue: '{{count}} 項 · {{hours}}h · 完成 {{done}}' })}</span>
+        {/* 加班跟在工作項小计后面：周会念的是「这条主线本周花了 20 小时，其中 4 小时是晚上」，
+            只在总计卡上拆会让加班找不到归属 */}
+        {g.overtime > 0 && (
+          <span className="rp-ot">{t('cpm.workReport.groupOvertime', { overtime: g.overtime, defaultValue: '含加班 {{overtime}}h' })}</span>
+        )}
         <DeltaChip delta={g.avgEnd - g.avgStart} />
       </div>
       <div className="rp-cmp__track">
@@ -433,7 +446,10 @@ function GroupBlock({ g }: { g: ReportGroupRow }) {
               <i style={{ width: `${r.pEnd}%` }} />
             </span>
             <span className="rp-cmp__task-num">{r.pStart}% → {r.pEnd}%</span>
-            <span className="rp-cmp__task-hours">{r.hours}h</span>
+            <span className="rp-cmp__task-hours">
+              {r.hours}h
+              {r.overtime > 0 && <em className="rp-ot">+{r.overtime}h</em>}
+            </span>
             <Tag color={statusTagColor(r)} style={{ marginInlineEnd: 0 }}>{statusLabel(r, t)}</Tag>
             {r.overdueDays > 0 && <Tag color="red" style={{ marginInlineEnd: 0 }}>{t('cpm.workReport.overdueShort', { days: r.overdueDays, defaultValue: '逾期 {{days}}d' })}</Tag>}
           </div>

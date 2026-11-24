@@ -6,11 +6,10 @@
  * 完整许可条款见仓库根目录 LICENSE 文件。
  */
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Alert, Button, DatePicker, Modal, Select, Tag, Tooltip, message } from 'antd'
 import {
-  ArrowLeftOutlined, ClearOutlined,
+  ClearOutlined,
   PlusOutlined, ScheduleOutlined, SettingOutlined,
 } from '@ant-design/icons'
 import dayjs, { type Dayjs } from 'dayjs'
@@ -24,11 +23,13 @@ import './holidayConfig.css'
 /**
  * 節假日配置（/cpm-holiday，獨立一級菜單 cpm-holiday；種子見 cpm:menu:v1.1，动作集 view,edit）。
  *
- * 头部与模块卡片遵循全局新增/表单页规范（橙色渐变动画条 + 返回 + 蓝色标题；
- * div 卡片 + 28×28 图标色块标题行）。本页为「即改即生效」的配置面而非单据表单，
- * 故无底部 form-footer：所有变更直接写入台账共用存储，实时反映到甘特、耗时与汇报。
+ * 本页是**独立菜单页**，不是从台账跳转过去的子页：所以头部不放返回按钮——
+ * 左侧菜单就是它的入口，一个「返回台账」的箭头会把人引向一条并不存在的层级关系。
+ * 头部按全局规范保留橙色渐变动画条 + 标题；年度筛选下沉到 `.search-section`，
+ * 统计卡仍在查询区下方（§E.8），与其他列表菜单同一自上而下顺序。
  *
  * 日期类型四选一：節假日/調休/請假 不计工时，補班（周末上班）计工时。
+ * 本页为「即改即生效」的配置面而非单据表单，故无底部 form-footer。
  */
 
 const TYPE_META = Object.fromEntries(SPECIAL_DAY_TYPES.map(t => [t.value, t])) as Record<SpecialDayType, typeof SPECIAL_DAY_TYPES[number]>
@@ -48,7 +49,6 @@ interface CalCell {
 const EMPTY: GanttData = { groups: [], holidays: [], makeup: [], compOff: [], leave: [] }
 
 export default function HolidayConfig() {
-  const navigate = useNavigate()
   const { t } = useTranslation()
   const [data, setData] = useState<GanttData>(EMPTY)
   const [loading, setLoading] = useState(true)
@@ -211,22 +211,27 @@ export default function HolidayConfig() {
           message={t('cpm.holiday.loadFailed', { defaultValue: '日曆載入失敗' })} description={loadError}
           action={<Button size="small" onClick={() => void reload()}>{t('cpm.sourceImport.retry', { defaultValue: '重試' })}</Button>} />
       )}
-      {/* 頁面頭部：全局規範（橙色漸變動畫條 + 返回 + 藍色標題） */}
+      {/* 頁面頭部：独立菜单页——渐变动画条 + 标题，无返回按钮（入口在左侧菜单） */}
       <div className="hc-pagehead">
         <div className="hc-pagehead__bar" />
         <div className="hc-pagehead__row">
           <div className="hc-pagehead__left">
-            <Button type="primary" className="hc-back" icon={<ArrowLeftOutlined />} onClick={() => navigate('/cpm-my')}>{t('common.back', { defaultValue: '返回' })}</Button>
-            <span className="hc-pagehead__divider" />
             <h2>{t('cpm.holiday.title', { defaultValue: '節假日配置' })}</h2>
             <span className="hc-pagehead__sub">{t('cpm.holiday.subtitle', { defaultValue: '工作日口徑：節假日/調休/請假不計工時，補班計入；改動實時同步台账與匯報' })}</span>
           </div>
-          <div className="hc-pagehead__years">
-            {[year - 1, year, year + 1].map(y => (
-              <Button key={y} size="small" type={y === year ? 'primary' : 'default'} onClick={() => setYear(y)}>{y}</Button>
-            ))}
-          </div>
         </div>
+      </div>
+
+      {/* 查询区：年度筛选。它从头部右侧搬到这里，是为了让统计卡能落在查询区下方——
+          先给数字再说口径，与其他列表菜单同一顺序；留在头部就会让人先看到未过滤的全量 */}
+      <div className="search-section hc-search">
+        <span className="hc-search__label">{t('cpm.holiday.searchYear', { defaultValue: '年度' })}</span>
+        <div className="hc-search__years">
+          {[year - 1, year, year + 1].map(y => (
+            <Button key={y} size="small" type={y === year ? 'primary' : 'default'} onClick={() => setYear(y)}>{y}</Button>
+          ))}
+        </div>
+        <span className="hc-search__hint">{t('cpm.holiday.searchHint', { defaultValue: '切换年度只看该年的口径与登记明细' })}</span>
       </div>
 
       {/* 統計與圖例 */}

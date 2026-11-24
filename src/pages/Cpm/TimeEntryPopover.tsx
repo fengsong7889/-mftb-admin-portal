@@ -12,7 +12,7 @@ import dayjs from 'dayjs'
 import { useTranslation } from 'react-i18next'
 import {
   createCpmTimeEntry, deleteCpmTimeEntry,
-  type CpmItemTimeVO, type CpmItemVO, type CpmTimeEntryForm, type CpmTimeEntryVO,
+  type CpmItemTimeVO, type CpmTimeEntryForm, type CpmTimeEntryVO,
 } from '@/api/cpm'
 import HelpPopover from '@/components/HelpPopover'
 import { calcSegmentMinutes, formatMinutes, formatSegmentRange, MAX_SEGMENT_MINUTES, toClockInput } from './cpmTime'
@@ -31,16 +31,27 @@ import './cpm.css'
  */
 
 interface Props {
-  item: CpmItemVO
+  /**
+   * 只用到 id 与 title 两个字段，所以下游只要求这两件。
+   *
+   * <p>不写成 CpmItemVO：台账行本来就是同一张表的另一种投影（GanttTask），叫它凑一份
+   * 日视图专用的完整 VO，只会逼调用方为了一次记时而先去拉一整条条目详情。
+   */
+  item: { id: number | string; title: string }
   dateStr: string
-  /** 该条目当天的投入时段（随日视图一次带回，不逐条目另发请求） */
-  day: CpmItemTimeVO | undefined
+  /** 该条目当天的投入时段（随日视图一次带回）；与 load 二选一，同时传时以 day 为准 */
+  day?: CpmItemTimeVO
+  /**
+   * 弹层打开时才拉时段：台账有几百行，为每个可能不点的记时按钮预先发一次请求，
+   * 就是把一个行内小动作变成一整页的请求风暴。不传就是「调用方已经带上了」。
+   */
+  load?: () => Promise<CpmItemTimeVO | undefined>
   onChanged: () => Promise<void> | void
 }
 
 const NOTE_MAX = 200
 
-export default function TimeEntryPopover({ item, dateStr, day, onChanged }: Props) {
+export default function TimeEntryPopover({ item, dateStr, day, load, onChanged }: Props) {
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   const [start, setStart] = useState<string | undefined>()
@@ -49,8 +60,22 @@ export default function TimeEntryPopover({ item, dateStr, day, onChanged }: Prop
   const [manualMinutes, setManualMinutes] = useState<number | null>(null)
   const [note, setNote] = useState('')
   const [saving, setSaving] = useState(false)
+  /** load 模式下的已取时段：取完后存在这里，保存后的刷新也走这里而不是等整页重拉 */
+  const [fetched, setFetched] = useState<CpmItemTimeVO | undefined>()
+  const [loading, setLoading] = useState(false)
 
-  const segments = day?.segments ?? []
+  const handleOpenChange = (next: boolean) => {
+    setOpen(next)
+    if (!next || !load || day !== undefined || fetched) return
+    setLoading(true)
+    void load()
+      .then(setFetched)
+      // 取失败时当成「没有时段」而不是卡住：记时本体是写动作，不能因为读列表挂了就无法补记
+      .catch(() => setFetched(undefined))
+      .finally(() => setLoading(false))
+  }
+
+  const segments = (day ?? fetched)?.segments ?? []
   const computed = calcSegmentMinutes(start, end, crosses)
   /** 显式覆盖优先，否则用起止算出的值；两者都拿不到就是「还没填够」 */
   const effective = manualMinutes ?? computed ?? null
@@ -84,9 +109,12 @@ export default function TimeEntryPopover({ item, dateStr, day, onChanged }: Prop
         durationMinutes: effective,
         note: note.trim() || undefined,
       }
-      await createCpmTimeEntry(item.id, form)
+      await createCpmTimeEntry(Number(item.id), form)
       resetDraft()
       message.success(t('cpm.timeEntry.saved', { defaultValue: '已記錄' }))
+      // load 模式下自己重取一次：否则刚存的时段要等整页重拉才看得见，
+      // 用户会以为没保存住再点一次，就多出两行重复事实
+      if (load && day === undefined) setFetched(await load())
       await onChanged()
     } finally {
       setSaving(false)
@@ -117,6 +145,7 @@ export default function TimeEntryPopover({ item, dateStr, day, onChanged }: Prop
       okButtonProps: { danger: true },
       onOk: async () => {
         await deleteCpmTimeEntry(segment.id)
+        if (load && day === undefined) setFetched(await load())
         await onChanged()
       },
     })
@@ -125,7 +154,7 @@ export default function TimeEntryPopover({ item, dateStr, day, onChanged }: Prop
   return (
     <Popover
       open={open}
-      onOpenChange={setOpen}
+      onOpenChange={handleOpenChange}
       trigger="click"
       placement="left"
       title={(
@@ -141,7 +170,8 @@ export default function TimeEntryPopover({ item, dateStr, day, onChanged }: Prop
       content={(
         <div className="cpm-time__panel">
           <div className="cpm-time__list">
-            {segments.length === 0 && <div className="cpm-time__empty">{t('cpm.timeEntry.empty', { defaultValue: '今天還沒有投入時段' })}</div>}
+            {loading && <div className="cpm-time__empty">{t('cpm.timeEntry.loading', { defaultValue: '時段載入中…' })}</div>}
+            {!loading && segments.length === 0 && <div className="cpm-time__empty">{t('cpm.timeEntry.empty', { defaultValue: '今天還沒有投入時段' })}</div>}
             {segments.map(segment => (
               <div className="cpm-time__row" key={segment.id}>
                 <div className="cpm-time__row-main">

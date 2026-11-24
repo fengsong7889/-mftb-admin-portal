@@ -7,17 +7,32 @@
  */
 package com.mftb.admin.service.cpm;
 
+import com.mftb.admin.common.BusinessException;
 import com.mftb.admin.constant.CpmConstants;
+import com.mftb.admin.constant.MeetingConstants;
+import com.mftb.admin.dto.CpmWorklogDto;
 import com.mftb.admin.entity.CpmItem;
 import com.mftb.admin.entity.CpmItemUpdate;
+import com.mftb.admin.entity.SysUser;
+import com.mftb.admin.mapper.CpmItemMapper;
+import com.mftb.admin.mapper.CpmItemUpdateMapper;
+import com.mftb.admin.mapper.CpmWorkCalendarMapper;
+import com.mftb.admin.mapper.CpmWorklogGroupMapper;
+import com.mftb.admin.service.MeetingActionSource;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * 台账工作端口径与备注净化的口径单测。
@@ -140,6 +155,131 @@ class CpmWorklogLedgerTest {
         assertThat(CpmNoteHtml.toPlainText("第一行<br>第二行")).isEqualTo("第一行\n第二行");
         assertThat(CpmNoteHtml.toPlainText("<b>加粗</b>與<span style=\"color:red\">紅色</span>")).isEqualTo("加粗與紅色");
         assertThat(CpmNoteHtml.toPlainText("<script>alert(1)</script>安全")).isEqualTo("安全");
+    }
+
+    @Test
+    @DisplayName("耗时口径：只有 source=manual 的正数才算手改覆盖，段合计不抢计划工时")
+    void manualHoursOverrideOnlyForManualSource() {
+        CpmItem auto = new CpmItem();
+        auto.setWorkHours(null);
+        assertThat(CpmWorklogService.manualHoursOf(auto)).isNull();
+
+        CpmItem manual = new CpmItem();
+        manual.setWorkHours(new java.math.BigDecimal("3.0"));
+        manual.setWorkHoursSource(CpmConstants.WORKLOG_HOURS_SOURCE_MANUAL);
+        assertThat(CpmWorklogService.manualHoursOf(manual)).isEqualByComparingTo("3.0");
+
+        // 记时时段回算写的是同一列但标 source=segment：它是「实际量了多少」，
+        // 不能拿来当台账计划工时的覆盖值，否则一补时间就把计划口径顶掉
+        CpmItem segment = new CpmItem();
+        segment.setWorkHours(new java.math.BigDecimal("1.5"));
+        segment.setWorkHoursSource(CpmConstants.WORKLOG_HOURS_SOURCE_SEGMENT);
+        assertThat(CpmWorklogService.manualHoursOf(segment)).isNull();
+
+        // 0 不是「估了零小时」而是「没估」，留着它会让汇报算出 0h 的本期投入
+        CpmItem zero = new CpmItem();
+        zero.setWorkHours(java.math.BigDecimal.ZERO);
+        zero.setWorkHoursSource(CpmConstants.WORKLOG_HOURS_SOURCE_MANUAL);
+        assertThat(CpmWorklogService.manualHoursOf(zero)).isNull();
+    }
+
+    @Test
+    @DisplayName("已取消只认 cancelled/released：开完的会仍然可以导入与汇报")
+    void nonDeliverableStatuses() {
+        assertThat(MeetingConstants.isNonDeliverable(MeetingConstants.STATUS_CANCELLED)).isTrue();
+        assertThat(MeetingConstants.isNonDeliverable(MeetingConstants.STATUS_RELEASED)).isTrue();
+        assertThat(MeetingConstants.isNonDeliverable(MeetingConstants.STATUS_BOOKED)).isFalse();
+        assertThat(MeetingConstants.isNonDeliverable(MeetingConstants.STATUS_CHECKED_IN)).isFalse();
+        assertThat(MeetingConstants.isNonDeliverable(MeetingConstants.STATUS_FINISHED)).isFalse();
+    }
+
+    @Test
+    @DisplayName("导入会议是新来源：没进 CHECK 白名单就会界面导得出、写库报错")
+    void meetingIsARegisteredSource() {
+        assertThat(CpmConstants.SOURCE_TYPES).contains(CpmConstants.SOURCE_MEETING);
+        // 会议本体与行动项必须是两个取值：同一个值会让唯一键把两种导入判成一件事
+        assertThat(CpmConstants.SOURCE_MEETING).isNotEqualTo(CpmConstants.SOURCE_MEETING_ACTION);
+    }
+
+    @Test
+    @DisplayName("周期快照 R1–R5：期内取最后一笔、期前沿用、从未更新给 0、存量取当前、未来截断")
+    void periodSnapshotRules() {
+        LocalDate today = MON.plusDays(20);
+        CpmItem item = new CpmItem();
+        item.setProgress(80);
+        item.setPlanStart(MON);
+        item.setPlanEnd(MON.plusDays(18));
+        List<CpmProgressSnapshots.Point> points = List.of(
+                new CpmProgressSnapshots.Point(MON, 25),
+                new CpmProgressSnapshots.Point(MON.plusDays(8), 50),
+                new CpmProgressSnapshots.Point(MON.plusDays(15), 80)
+        );
+
+        assertThat(CpmProgressSnapshots.snapshot(points, item, MON, MON.plusDays(6), today))
+                .isEqualTo(new CpmProgressSnapshots.Snapshot(25, CpmProgressSnapshots.PERIOD, MON.plusDays(15)));
+        assertThat(CpmProgressSnapshots.snapshot(points, item, MON.plusDays(7), MON.plusDays(13), today))
+                .isEqualTo(new CpmProgressSnapshots.Snapshot(50, CpmProgressSnapshots.PERIOD, MON.plusDays(15)));
+        assertThat(CpmProgressSnapshots.snapshot(points, item, MON.plusDays(14), MON.plusDays(20), today))
+                .isEqualTo(new CpmProgressSnapshots.Snapshot(80, CpmProgressSnapshots.PERIOD, MON.plusDays(15)));
+        // 本期一次都没更新：沿用期前最后一笔，不编 0%
+        assertThat(CpmProgressSnapshots.snapshot(points, item, MON.plusDays(9), MON.plusDays(14), today))
+                .isEqualTo(new CpmProgressSnapshots.Snapshot(50, CpmProgressSnapshots.STALE, MON.plusDays(15)));
+        // 期末早于首笔流水：该期尚未开始
+        assertThat(CpmProgressSnapshots.snapshot(points, item, MON.minusDays(6), MON.minusDays(1), today))
+                .isEqualTo(new CpmProgressSnapshots.Snapshot(0, CpmProgressSnapshots.NOT_STARTED, MON.plusDays(15)));
+        // 存量无流水：取当前真实值，不把「没记录」谎报成「没开始」
+        assertThat(CpmProgressSnapshots.snapshot(List.of(), item, MON, MON.plusDays(6), today))
+                .isEqualTo(new CpmProgressSnapshots.Snapshot(80, CpmProgressSnapshots.LEGACY, null));
+        assertThat(CpmProgressSnapshots.snapshot(points, item, null, null, today))
+                .isEqualTo(new CpmProgressSnapshots.Snapshot(80, CpmProgressSnapshots.LIVE, MON.plusDays(15)));
+        // 未来档：不能算出一个尚未发生的期末值
+        assertThat(CpmProgressSnapshots.snapshot(points, item, MON.plusDays(21), MON.plusDays(27), today))
+                .isEqualTo(new CpmProgressSnapshots.Snapshot(80, CpmProgressSnapshots.FUTURE, MON.plusDays(15)));
+    }
+
+    @Test
+    @DisplayName("工时上限与加班拆分：工作日 × 24h、列宽 999 截断、加班由合计减正常额度派生")
+    void hoursCapAndOvertimeSplit() {
+        assertThat(CpmWorkdays.hoursCap(2)).isEqualTo(48);
+        assertThat(CpmWorkdays.hoursCap(0)).isEqualTo(24);
+        assertThat(CpmWorkdays.hoursCap(100)).isEqualTo(CpmConstants.WORKLOG_HOURS_MAX);
+        assertThat(CpmWorkdays.normalHoursOf(20, 2)).isEqualTo(16);
+        assertThat(CpmWorkdays.overtimeHoursOf(20, 2)).isEqualTo(4);
+        assertThat(CpmWorkdays.overtimeHoursOf(3, 2)).isZero();
+        assertThat(CpmWorkdays.overtimeHoursOf(0, 0)).isZero();
+    }
+
+    @Test
+    @DisplayName("手工工时超上限由服务端拒写：前端校验不是安全边界")
+    void manualHoursOverCapRejected() {
+        CpmWorklogGroupMapper groupMapper = mock(CpmWorklogGroupMapper.class);
+        CpmItemMapper itemMapper = mock(CpmItemMapper.class);
+        CpmItemUpdateMapper updateMapper = mock(CpmItemUpdateMapper.class);
+        CpmWorkCalendarMapper calendarMapper = mock(CpmWorkCalendarMapper.class);
+        CpmWorkdays workdays = mock(CpmWorkdays.class);
+        CpmAccessGuard guard = mock(CpmAccessGuard.class);
+        CpmPeriods periods = mock(CpmPeriods.class);
+        MeetingActionSource meetingActions = mock(MeetingActionSource.class);
+        SysUser current = new SysUser();
+        current.setId(7L);
+        current.setUsername("tester");
+        current.setName("測試者");
+        when(guard.currentUser()).thenReturn(current);
+        when(periods.today()).thenReturn(MON);
+        when(workdays.load(anyLong(), any(), any())).thenReturn(new CpmWorkdays.Ledger(Map.of()));
+        CpmWorklogService service = new CpmWorklogService(
+                groupMapper, itemMapper, updateMapper, calendarMapper, workdays, guard, periods, meetingActions);
+
+        CpmWorklogDto.TaskForm form = new CpmWorklogDto.TaskForm();
+        form.setTitle("加班超限");
+        form.setStart(MON.toString());
+        // 11-16 周一到 11-18 周三共 3 个工作日，上限 72h；73 必须被服务端拒绝
+        form.setEnd(MON.plusDays(2).toString());
+        form.setHours(new BigDecimal("73"));
+
+        assertThatThrownBy(() -> service.createTask(form))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("耗時超出上限");
     }
 
     private static CpmItemUpdate trail(LocalDate date, int progress) {

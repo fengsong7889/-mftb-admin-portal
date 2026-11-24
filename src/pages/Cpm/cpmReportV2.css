@@ -358,12 +358,29 @@
   font-variant-numeric: tabular-nums;
 }
 .rp-cmp__task-hours {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
   flex: none;
-  width: 40px;
+  /* 40px 只够一个「20h」：加上加班角标就会被挤到换行，整行高度跳动 */
+  width: 64px;
   text-align: right;
   font-size: 11px;
   color: var(--text-3);
   font-variant-numeric: tabular-nums;
+}
+/* 加班标记：全页只留这一类弱色块，不让它和「逾期」的红色抢注意力——
+   加班是投入事实，不是需要处理的异常 */
+.rp-ot {
+  font-style: normal;
+  padding: 0 4px;
+  border-radius: 3px;
+  font-size: 11px;
+  line-height: 15px;
+  color: var(--warning-deep);
+  background: color-mix(in srgb, var(--warning-deep) 12%, transparent);
+  white-space: nowrap;
 }
 
 /* ==================== 04 工時分布 ==================== */

@@ -17447,7 +17447,7 @@
     "sourceImport": {
       "title": "Import From Business Objects",
       "button": "Link Import",
-      "tip": "Bring in your requirements and meeting action items",
+      "tip": "Bring in your requirements, tasks, meeting schedules, and meeting action items",
       "tabRdm": "R&D requirements",
       "tabMeeting": "Meeting actions",
       "search": "Search by title or requirement no.",
@@ -17470,7 +17470,8 @@
       "searchTask": "Search by task title or task number",
       "syncHint": "Once on, this item’s progress updates write back to the RDM task; RDM rules still reject illegal reports",
       "syncLabel": "Write-back",
-      "tabRdmTask": "R&D tasks"
+      "tabRdmTask": "R&D tasks",
+      "tabMeetingBooking": "Meeting schedule"
     },
     "sourceRole": {
       "submitter": "Submitted by me",
@@ -17777,7 +17778,8 @@
       "saved": "Recorded",
       "title": "Time ({{date}})",
       "todayTotal": "Today total {{minutes}}",
-      "tooltip": "{{minutes}} recorded today"
+      "tooltip": "{{minutes}} recorded today",
+      "loading": "Loading segments…"
     },
     "worklog": {
       "detailEllipsis": "Details…",
@@ -17806,7 +17808,10 @@
         "ganttSwitchTip": "On shows the Gantt chart, off switches to the list",
         "list": "List",
         "showWeekends": "Show weekends",
-        "today": "Back to today"
+        "today": "Back to today",
+        "ai": "AI Assistant",
+        "aiTip": "Paste your running log; the system drafts sub-tasks for you to tick",
+        "meetingTip": "Import meetings you host or attend that have not been cancelled; plan dates follow the meeting schedule"
       },
       "badge": {
         "leave": "Lv",
@@ -17831,7 +17836,9 @@
         "note": "Notes / reason",
         "progress": "Progress",
         "start": "Start date",
-        "task": "Subtask"
+        "task": "Subtask",
+        "progressEnd": "Progress ({{name}} end)",
+        "progressEndTip": "Shows the value recorded by the end of the selected period. If nothing changed in the period, the last earlier value is kept; if there was no record yet, it shows 0%. Click the progress cell to update the current value."
       },
       "confirm": {
         "deleteItemTitle": "Delete this whole work item?",
@@ -17884,8 +17891,23 @@
         "pdfDone": "Downloaded the A4 paginated PDF of the current ledger"
       },
       "hours": {
-        "tip": "{{days}} workdays × {{hours}}h (weekends/holidays excluded)",
-        "value": "{{hours}} h"
+        "tip": "{{days}} workdays × {{hours}}h = {{hours}}h (weekends/holidays excluded) · click to edit",
+        "value": "{{hours}} h",
+        "current": "Currently {{hours}} h",
+        "hint": "Regular capacity: {{days}} workdays × {{hours}}h = {{auto}}h; overtime cap {{cap}}h (× {{perDay}}h). Weekends and holidays are excluded.",
+        "manualTip": "Entered manually · click to edit",
+        "modeAuto": "Workday estimate",
+        "modeManual": "Manual entry",
+        "reset": "Restore auto ({{days}} workdays × 8h = {{hours}}h)",
+        "save": "Save",
+        "unit": "h",
+        "unscheduled": "Unscheduled",
+        "hintUnscheduled": "Not scheduled yet, so the cap is one workday ({{cap}}h); it narrows once scheduled.",
+        "over": "Up to {{cap}}h ({{days}} workdays × {{perDay}}h). Lengthen the schedule to allow more.",
+        "overtimeBadge": "Overtime {{overtime}}h · excluded from regular hours",
+        "overtimeTip": "Regular {{normal}}h ({{days}} workdays × {{hours}}h) + overtime {{overtime}}h",
+        "split": "Regular {{normal}}h + overtime {{overtime}}h = total {{total}}h ({{days}} workdays × {{hours}}h)",
+        "splitNormal": "Within regular capacity: {{normal}}h (this period allows {{days}} workdays = {{auto}}h); no overtime"
       },
       "inline": {
         "clickToEdit": "Click to edit"
@@ -17988,12 +18010,15 @@
         "pendingNow": "To finish",
         "pendingNowTip": "Current status is pending or unscheduled",
         "pendingStart": "Not started",
-        "pendingTip": "End-of-period progress 0%"
+        "pendingTip": "End-of-period progress 0%",
+        "hoursSplitTip": "Regular {{normal}}h + overtime {{overtime}}h; overtime is derived from the total minus workdays × 8h, not stored separately",
+        "hoursWithOt": "Total hours · includes {{overtime}}h overtime"
       },
       "status": {
         "deriveTip": "Derived from progress: 100% done; 1–99% in progress; 0% pending; unscheduled stays unscheduled",
         "plan": "Unscheduled",
-        "todo": "Pending"
+        "todo": "Pending",
+        "cancelledTip": "The source meeting was cancelled: the plan is kept as a fact, but it no longer counts as pending or as hours"
       },
       "subtaskN": "Subtask {{count}}",
       "suffix": {
@@ -18001,7 +18026,8 @@
         "percent": "%"
       },
       "tabbar": {
-        "summary": "{{tasks}} subtasks · {{workdays}} workdays"
+        "summary": "{{tasks}} subtasks · {{workdays}} workdays",
+        "cancelled": " · {{count}} cancelled (excluded from hours)"
       },
       "undo": "Undo",
       "weekNth": "Week {{count}}",
@@ -18016,7 +18042,8 @@
       ],
       "import": {
         "button": "Import my local ledger",
-        "done": "Imported the local ledger ({{count}} work items)"
+        "done": "Imported the local ledger ({{count}} work items)",
+        "tip": "Move the ledger kept in this browser onto the server in one pass"
       },
       "loadFailed": "Failed to load the ledger",
       "loading": "Loading the ledger…",
@@ -18024,6 +18051,27 @@
       "tab": {
         "day": "Day view",
         "ledger": "Work ledger"
+      },
+      "category": {
+        "general": "General"
+      },
+      "progress": {
+        "historyDelta": "{{value}}% vs last week",
+        "historyNow": "Now at {{value}}%, not yet saved as a new weekly record",
+        "historyTitle": "Progress by week",
+        "noHistory": "No progress updates yet",
+        "thisWeek": "This week",
+        "week": "Week {{week}}",
+        "latest": "Latest progress",
+        "live": "Current latest",
+        "review": "Past-period snapshot",
+        "reviewNote": "This period has closed and is shown for reference only; saving records today’s update.",
+        "tipFuture": "The period has not ended yet; showing the current value",
+        "tipLegacy": "No progress trail; showing the current value",
+        "tipLive": "Current actual progress · click to update",
+        "tipNotStarted": "The period had not started (0%) · click to update the current value",
+        "tipPeriod": "{{label}} end-of-period snapshot · click to update the current progress",
+        "tipStale": "No update in this period; the last earlier value is kept · click to update the current value"
       }
     },
     "holiday": {
@@ -18073,7 +18121,9 @@
       "workday": "Workday",
       "workdaysYear": "Workdays this year",
       "loadFailed": "Failed to load the calendar",
-      "refreshStatutory": "Sync statutory holidays"
+      "refreshStatutory": "Sync statutory holidays",
+      "searchHint": "Switch the year to view only that year’s settings and details",
+      "searchYear": "Year"
     },
     "workReport": {
       "anchor": "Anchor date",
@@ -18147,7 +18197,10 @@
         "contentRow": "- {{task}}{{inserted}} — {{from}}% → {{to}}% · {{hours}}h · {{status}}",
         "insertedMark": " [ad-hoc]",
         "noContent": "- No scheduled work items in this period",
-        "backlogItem": "- [Unscheduled] {{count}} items have no schedule and bill no hours"
+        "backlogItem": "- [Unscheduled] {{count}} items have no schedule and bill no hours",
+        "groupTitleOt": "### {{title}} ({{count}} items · {{hours}}h, including {{overtime}}h overtime)",
+        "overtime": "- Overtime {{overtime}}h (regular {{normal}}h)",
+        "overtimeMark": " (includes {{overtime}}h overtime)"
       },
       "outputs": {
         "none": "Nothing completed this period — see the next section for in-flight work."
@@ -18159,7 +18212,8 @@
         "inserted": "{{count}} ad-hoc insertions",
         "progress": "Average progress {{from}}% → {{to}}% ({{delta}}%)",
         "risks": "{{count}} overdue items need attention",
-        "sep": ", "
+        "sep": ", ",
+        "overtime": "including {{overtime}}h overtime (regular {{normal}}h)"
       },
       "overdueDays": "Overdue {{days}} days",
       "overdueShort": "Overdue {{days}}d",
@@ -18188,7 +18242,9 @@
       "stat": {
         "avgEnd": "End-of-period progress",
         "hours": "Hours invested",
-        "risks": "Risk items"
+        "risks": "Risk items",
+        "overtime": "Includes {{overtime}}h overtime",
+        "overtimeTip": "Regular {{normal}}h + overtime {{overtime}}h; derived by the server from intersecting workdays, not stored as a separate field"
       },
       "summaryPlaceholder": "Write one line as the period summary (leave empty to use the auto overview, same text on export)",
       "tab": {
@@ -18201,7 +18257,28 @@
       "title": "Work Report",
       "covered": "Covered",
       "loadFailed": "Failed to load the report",
-      "loading": "Aggregating the report…"
+      "loading": "Aggregating the report…",
+      "groupOvertime": "includes {{overtime}}h overtime"
+    },
+    "meetingImport": {
+      "button": "Import Meetings",
+      "close": "Close",
+      "dayFormat": "MM-DD HH:mm",
+      "empty": "No meetings available to import",
+      "endTimeFormat": "HH:mm",
+      "hint": "Lists only meetings you host or attend that have not been cancelled. Importing sets the plan start and end to the meeting schedule, which you can edit afterwards. If the meeting is cancelled later, the task is marked cancelled automatically.",
+      "import": "Import",
+      "importTip": "Adds a ledger sub-task whose plan dates come from the meeting schedule",
+      "importedTip": "This meeting was already imported; importing it again will be rejected",
+      "importedToast": "Imported as a work record; plan dates follow the meeting schedule",
+      "loadError": "Failed to load the meeting list",
+      "roleOrganizer": "Hosted by me",
+      "roleParticipant": "I attended",
+      "search": "Search by meeting title or number",
+      "statusBooked": "Scheduled",
+      "statusCheckedIn": "In progress",
+      "statusFinished": "Finished",
+      "title": "Import Meetings"
     }
   }
 }

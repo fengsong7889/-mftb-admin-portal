@@ -101,6 +101,35 @@ public final class CpmDto {
         private BigDecimal planHours;
     }
 
+    /**
+     * 導入會議候选（给持續績效台账用）。
+     *
+     * <p>不往 {@link SourceVO} 里加字段复用：那个形状只有一个 {@code dueDate}（单日时限），
+     * 而会议的本质是一段区间。共用一个形状就会在一个列表里出现两种日期语义，
+     * 用户看不出哪个是「截止日」哪个是「会议起止」，导入后才知道带成了两个日期。
+     *
+     * <p>状态/角色同样只给原始码：会议状态机属于会议域，在这里翻成中文就是一份副本词表。
+     */
+    @Data
+    public static class MeetingSourceVO {
+        /** biz_meeting_booking.id，导入后直接落 biz_cpm_item.source_ref */
+        private long bookingId;
+        /** 会议编号（界面副行素材） */
+        private String bookingNo;
+        private String title;
+        /** 预定开始 ISO 日期时间；导入后作为子任務的计划起日 */
+        private String startTime;
+        /** 预定结束 ISO 日期时间；导入后作为子任務的计划止日 */
+        private String endTime;
+        /** booked / checked_in / finished；cancelled 与 released 不候选 */
+        private String statusCode;
+        /** organizer / participant */
+        private String role;
+        private String roomName;
+        /** 本人是否已导入过该会议（真防重仍靠条目唯一键） */
+        private boolean imported;
+    }
+
     @Data
     public static class ProgressForm {
         @NotNull

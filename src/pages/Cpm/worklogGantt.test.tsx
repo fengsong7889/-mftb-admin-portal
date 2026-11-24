@@ -159,9 +159,9 @@ describe('统一工作记录视图', () => {
     expect(screen.queryByRole('button', { name: /收合左欄/ })).toBeNull()
     expect(screen.queryByText(/顯示周末/)).toBeNull()
     expect(screen.queryByRole('button', { name: /回到今天/ })).toBeNull()
-    // 与甘特无关的动作在两种形态下都保留
+    // 与甘特无关的动作在两种形态下都保留；节假日配置已升为独立菜单，不再占功能区
     expect(screen.getByRole('button', { name: /新增工作項/ })).toBeTruthy()
-    expect(screen.getByRole('button', { name: /節假日配置/ })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /節假日配置/ })).toBeNull()
   })
 
   it('工作日口径说明收在左下角芯片，点开才给全文', async () => {

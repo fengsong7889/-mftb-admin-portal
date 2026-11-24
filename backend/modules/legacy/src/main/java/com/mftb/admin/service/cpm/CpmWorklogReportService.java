@@ -92,7 +92,14 @@ public class CpmWorklogReportService {
 
         List<CpmWorklogDto.ReportRowVO> rows = new ArrayList<>();
         int backlog = 0;
+        int cancelled = 0;
         for (CpmItem item : all) {
+            // 已取消不进本期內容、风险、备注、下期计划与工时：一场被取消的会没有可汇报的产出，
+            // 留在汇报里只会拉低平均进度、抬高总工时，让周会念出一堆本来就不存在的事
+            if (CpmConstants.STATUS_CANCELLED.equals(item.getStatus())) {
+                cancelled++;
+                continue;
+            }
             if (item.getPlanStart() == null || item.getPlanEnd() == null) {
                 backlog++;
                 continue;
@@ -110,7 +117,7 @@ public class CpmWorklogReportService {
 
         vo.setGroups(groupRows(rows, groups));
         vo.setDaily(daily(rows, calendar, from, to, vo));
-        fillTotals(vo, rows, backlog);
+        fillTotals(vo, rows, backlog, cancelled);
         return vo;
     }
 
@@ -129,7 +136,10 @@ public class CpmWorklogReportService {
         row.setPStart(progressAt(trail, item, from));
         row.setPEnd(progressAt(trail, item, to));
         row.setDelta(row.getPEnd() - row.getPStart());
-        row.setHours(calendar.hoursInPeriod(item.getPlanStart(), item.getPlanEnd(), from, to));
+        row.setHours(hoursOfRow(item, calendar, from, to));
+        /* 加班拆分与台账耗时列同一派生（合计减交集工作日 × 8h）：两边用不同区间算就
+           会出现「页面 20h 含 4h 加班、周报 20h 全算正常」这种各自都对但互相打脸 */
+        row.setOvertimeHours(CpmWorkdays.overtimeHoursOf(row.getHours(), periodWorkdays(item, calendar, from, to)));
         String doneAt = doneAt(trail, item);
         row.setDoneAt(doneAt != null && inRange(doneAt, from, to) ? doneAt : null);
         row.setOverdueDays(item.getPlanEnd().isBefore(today) && value(item.getProgress()) < 100
@@ -148,22 +158,7 @@ public class CpmWorklogReportService {
      * 编一个期初数字会让「本期推进」变成凭空产出。
      */
     static int progressAt(List<CpmItemUpdate> trail, CpmItem item, LocalDate date) {
-        Integer value = null;
-        for (CpmItemUpdate row : trail) {
-            if (row.getUpdateDate() != null && !row.getUpdateDate().isAfter(date)) {
-                value = row.getProgress();
-            }
-        }
-        if (value != null) {
-            return value;
-        }
-        if (!trail.isEmpty()) {
-            return 0;
-        }
-        if (item.getPlanStart() != null && date.isBefore(item.getPlanStart())) {
-            return 0;
-        }
-        return value(item.getProgress());
+        return CpmProgressSnapshots.at(CpmProgressSnapshots.ofUpdates(trail), item, date);
     }
 
     /** 完成时点：流水首次 ≥100；没有流水的存量数据如实取计划止日 */
@@ -222,6 +217,7 @@ public class CpmWorklogReportService {
             vo.setHue(group == null || group.getHue() == null ? 0 : group.getHue());
             vo.setRows(new ArrayList<>(groupRows));
             vo.setHours(groupRows.stream().mapToInt(CpmWorklogDto.ReportRowVO::getHours).sum());
+            vo.setOvertimeHours(groupRows.stream().mapToInt(CpmWorklogDto.ReportRowVO::getOvertimeHours).sum());
             vo.setAvgStart(round(groupRows.stream().mapToInt(CpmWorklogDto.ReportRowVO::getPStart).average().orElse(0)));
             vo.setAvgEnd(round(groupRows.stream().mapToInt(CpmWorklogDto.ReportRowVO::getPEnd).average().orElse(0)));
             vo.setDoneCount((int) groupRows.stream().filter(r -> r.getDoneAt() != null).count());
@@ -232,10 +228,15 @@ public class CpmWorklogReportService {
     }
 
     /**
-     * 每日投入：某天有几条任务的排期铺在上面，就是几个 8h。
+     * 每日投入：把每行的本期工时按它在本期占的几个工作日均摊到每一天。
      *
      * <p>这里用排期而不是时段表：汇报页的工时与甘特色条必须同源，否则用户会看到
      * 「色条铺满五天、每日柱状图只有两天」这种两边都算对却互相打脸的画面。
+     *
+     * <p>为什么改为均摊而不是直接 × 8h：手工耗时上线后，一行可能就是 3h 或 12h，
+     * 写死 8h 会让每日柱状图加起来不等于顶部总工时，而这两个数字在同一屏上。
+     * 均摊保持了旧口径下的恒等式（无手工值时每行每天恰好还是 8h），
+     * 而手工值本质上就是一个均匀假设——它本来就没被量过。
      */
     private List<CpmWorklogDto.ReportDayVO> daily(List<CpmWorklogDto.ReportRowVO> rows,
                                                   CpmWorkdays.Ledger calendar, LocalDate from, LocalDate to,
@@ -247,9 +248,10 @@ public class CpmWorklogReportService {
             if (!rest) {
                 String key = cur.toString();
                 for (CpmWorklogDto.ReportRowVO row : rows) {
-                    if (row.getStart().compareTo(key) <= 0 && row.getEnd().compareTo(key) >= 0) {
-                        hours += CpmConstants.WORKLOG_HOURS_PER_DAY;
+                    if (row.getStart().compareTo(key) > 0 || row.getEnd().compareTo(key) < 0) {
+                        continue;
                     }
+                    hours += perDayHours(row, calendar, from, to);
                 }
             }
             CpmWorklogDto.ReportDayVO day = new CpmWorklogDto.ReportDayVO(key0(cur), hours, rest);
@@ -261,13 +263,44 @@ public class CpmWorklogReportService {
         return out;
     }
 
+    /**
+     * 一行落在某一天的工时：本期工时 ÷ 本期交集工作日，除不尽时把余数给首日。
+     *
+     * <p>余数不能丢也不四舍五入：逐日四舍五入后加起来会与顶部总工时差 1h，
+     * 而那种差值永远需要有人来解释。首日多一分，两边就永远相等。
+     * <p>交集工作日为 0（区间内全是休息日）时归零：宁可不摊，也不除出 Infinity 或堆到区间外。
+     */
+    private int perDayHours(CpmWorklogDto.ReportRowVO row, CpmWorkdays.Ledger calendar,
+                            LocalDate from, LocalDate to) {
+        if (row.getHours() <= 0) {
+            return 0;
+        }
+        LocalDate start = maxDate(LocalDate.parse(row.getStart()), from);
+        LocalDate end = minDate(LocalDate.parse(row.getEnd()), to);
+        long days = calendar.workdays(start, end);
+        if (days <= 0) {
+            return 0;
+        }
+        int base = (int) (row.getHours() / days);
+        return base + (int) (row.getHours() % days);
+    }
+
+    private static LocalDate maxDate(LocalDate a, LocalDate b) {
+        return a.isAfter(b) ? a : b;
+    }
+
+    private static LocalDate minDate(LocalDate a, LocalDate b) {
+        return a.isBefore(b) ? a : b;
+    }
+
     private static String key0(LocalDate date) {
         return date.toString();
     }
 
-    private void fillTotals(CpmWorklogDto.ReportVO vo, List<CpmWorklogDto.ReportRowVO> rows, int backlog) {
+    private void fillTotals(CpmWorklogDto.ReportVO vo, List<CpmWorklogDto.ReportRowVO> rows, int backlog, int cancelled) {
         CpmWorklogDto.TotalsVO t = vo.getTotals();
         t.setTotal(rows.size());
+        t.setCancelled(cancelled);
         t.setDone((int) rows.stream().filter(r -> r.getDoneAt() != null).count());
         t.setDoing((int) rows.stream().filter(r -> r.getPEnd() > 0 && r.getPEnd() < 100).count());
         t.setPending((int) rows.stream().filter(r -> r.getPEnd() == 0).count());
@@ -275,6 +308,7 @@ public class CpmWorklogReportService {
         t.setRisks(vo.getRisks().size());
         t.setBacklog(backlog);
         t.setHours(rows.stream().mapToInt(CpmWorklogDto.ReportRowVO::getHours).sum());
+        t.setOvertimeHours(rows.stream().mapToInt(CpmWorklogDto.ReportRowVO::getOvertimeHours).sum());
         t.setAvgStart(round(rows.stream().mapToInt(CpmWorklogDto.ReportRowVO::getPStart).average().orElse(0)));
         t.setAvgEnd(round(rows.stream().mapToInt(CpmWorklogDto.ReportRowVO::getPEnd).average().orElse(0)));
         // 概览卡的「期末平均进度」与统计口径同源：两处各算一次就会出现卡片与明细不一致
@@ -291,6 +325,9 @@ public class CpmWorklogReportService {
 
     private static String stateOf(CpmItem item) {
         int progress = value(item.getProgress());
+        if (CpmConstants.STATUS_CANCELLED.equals(item.getStatus())) {
+            return CpmConstants.STATUS_CANCELLED;
+        }
         if (progress >= 100) {
             return CpmConstants.STATUS_DONE;
         }
@@ -298,6 +335,41 @@ public class CpmWorklogReportService {
             return "plan";
         }
         return progress > 0 ? CpmConstants.STATUS_DOING : CpmConstants.STATUS_TODO;
+    }
+
+    /**
+     * 交集工作日数：与 {@code hoursOfRow} 同一条区间口径。
+     *
+     * <p>加班量是「合计 − 交集工作日 × 8h」。拿整段工作日去减本期工时，
+     * 一场跳月的任务会被算出一堆根本不存在的加班（工时被本期截断，额度却没截）。
+     */
+    private static int periodWorkdays(CpmItem item, CpmWorkdays.Ledger calendar, LocalDate from, LocalDate to) {
+        LocalDate start = item.getPlanStart();
+        LocalDate end = item.getPlanEnd();
+        if (start == null || end == null) {
+            return 0;
+        }
+        LocalDate s = start.isAfter(from) ? start : from;
+        LocalDate e = end.isBefore(to) ? end : to;
+        return e.isBefore(s) ? 0 : calendar.workdays(s, e);
+    }
+
+    /**
+     * 本期工时：手工覆盖优先，否则取交集工作日 × 8h。
+     *
+     * <p>与台账列必须用同一个判据（只有 source=manual 才算覆盖）：一边算打卡合计、
+     * 一边算计划值，就会出现「页面 12h、推送 8h」——工时决定汇报数字与推送内容，
+     * 两处各算一次是本域从一开始就断掉的那条错。
+     * <p>手工值不拆到周期：把 12h 按工作日比例劈成「本周 4.3h」是编出来的数字，
+     * 有覆盖值时只在与本周期相交时整笔计入。
+     */
+    private int hoursOfRow(CpmItem item, CpmWorkdays.Ledger calendar, LocalDate from, LocalDate to) {
+        java.math.BigDecimal manual = CpmWorklogService.manualHoursOf(item);
+        if (manual == null) {
+            return calendar.hoursInPeriod(item.getPlanStart(), item.getPlanEnd(), from, to);
+        }
+        boolean overlaps = !item.getPlanEnd().isBefore(from) && !item.getPlanStart().isAfter(to);
+        return overlaps ? manual.setScale(0, java.math.RoundingMode.HALF_UP).intValue() : 0;
     }
 
     private static boolean inRange(String date, LocalDate from, LocalDate to) {

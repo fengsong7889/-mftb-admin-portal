@@ -121,6 +121,21 @@ public final class MeetingConstants {
     /** 允许签到或取消的窗口内状态（已收尾/已终止的单不再接受任何参会动作） */
     public static final Set<String> STATUS_OPEN = Set.of(STATUS_BOOKED, STATUS_CHECKED_IN);
 
+    /**
+     * 不构成可交付工作事实的状态：人为取消与未到场被系统释放。
+     *
+     * <p>分开于 {@link #STATUS_OPEN}：后者回答「还能不能对这个会做参会动作」，本集合回答
+     * 「这场会是不是真的发生过」。已结束的会不在里面：一场上周开完的会仍然要允许事后
+     * 补录工时与产出。下游两个消费点共用这一份名单：持續績效导入候选过滤，以及
+     * 台账读取时的「导入后会议被取消」对账。各列一份就会出现「导入得了、对不上账」。
+     */
+    public static final List<String> NON_DELIVERABLE_STATUSES = List.of(STATUS_CANCELLED, STATUS_RELEASED);
+
+    /** 这场会是否已被取消/释放（不再占用自己的工作日程）；台账对账与导入候选同一判定 */
+    public static boolean isNonDeliverable(String status) {
+        return NON_DELIVERABLE_STATUSES.contains(status);
+    }
+
     /** 允许的状态跳转表：键为当前状态，值为可达状态 */
     private static final java.util.Map<String, Set<String>> TRANSITIONS = java.util.Map.of(
             STATUS_BOOKED, Set.of(STATUS_CHECKED_IN, STATUS_CANCELLED, STATUS_RELEASED, STATUS_FINISHED),

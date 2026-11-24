@@ -12,6 +12,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -58,14 +59,43 @@ public final class CpmWorklogDto {
         /** 计划止日 yyyy-MM-dd */
         private String end;
         private int progress;
+        /** 查询周期期初进度快照；无区间时等于当前真实进度。 */
+        private int periodStartProgress;
+        /** 查询周期期末进度快照（期末取 min(rangeEnd, 业务今天)）；无区间时等于当前真实进度。 */
+        private int periodProgress;
+        /** 快照来源：live/period/stale/notStarted/legacy/future，前端不重算回退规则。 */
+        private String periodProgressKind;
+        /** 全部流水的最新日期；最新一笔就在被查看周期内时，往期快照卡不再重复展示。 */
+        private String latestProgressAt;
         /** 净化后的富文本备注（渲染前前端还会过一次白名单） */
         private String note;
         /** 计划属性 planned/inserted */
         private String planType;
         /** 标记为临时插入的日期；原计划为 null */
         private String insertedAt;
-        /** 整段总工时（工作日 × 8h），服务端算 */
+        /** 整段总工时（工作日 × 8h），服务端算；有手工覆盖时等于覆盖值 */
         private int hours;
+        /**
+         * 本期加班（hours 超出交集工作日 × 8h 的部分）；不入库，由服务端派生。
+         *
+         * <p>与 hours 同时回传：只给一个合计，台账列、统计卡与汇报会各自决定要不要
+         * 把超出部分叫加班，三个地方就能念出三个版本。
+         */
+        private int overtimeHours;
+        /**
+         * 手工耗时覆盖值（小时）；null=未覆盖，界面回落工作日口径。
+         *
+         * <p>与 {@code hours} 分两列回传：只给最终数字，界面就分不清该不该显示「已手工填写」，
+         * 也给不出「恢復自動」那条退路。
+         */
+        private BigDecimal hoursOverride;
+        /**
+         * 来源已取消（导入会议后被取消/释放）。
+         *
+         * <p>与 {@code state=cancelled} 开列而不是只看 state：界面要把色条降灰、统计要把
+         * 它从待完成里排掉，两者都靠这个标记；state 只能告诉人那一格写什么字。
+         */
+        private boolean cancelled;
         /** 落在本次查询区间内的工时；无区间时等于 hours */
         private int periodHours;
         private int workdays;
@@ -107,10 +137,14 @@ public final class CpmWorklogDto {
         private int done;
         private int doing;
         private int pending;
+        /** 来源已取消：单独成数，不进 done/doing/pending 任何一个，也不计入总工时 */
+        private int cancelled;
         private int inserted;
         private int backlog;
         private int risks;
         private int hours;
+        /** 本期加班合计：已含在 hours 里，单独成数才能把「两天」与「两天加一晚上班」分开念 */
+        private int overtimeHours;
         private int avgProgress;
         /** 期初平均进度：与期末成对出现，汇报的「本期推进 = 期末 - 期初」只能由服务端算一次 */
         private int avgStart;
@@ -148,6 +182,24 @@ public final class CpmWorklogDto {
         /** 岗位词表分类，缺省 general */
         @Size(max = 32)
         private String category;
+        /**
+         * 手工耗时覆盖（小时）。null=不改动；0 或负数=清除覆盖并退回工作日口径。
+         *
+         * <p>上限由服务端按工作日口径校验（见 {@code CpmWorkdays.hoursCap}：工作日数 × 24h，
+         * 再与列宽 999 取小），超限直接拒写；不信任前端传来的数字，也不静默改它。
+         */
+        private BigDecimal hours;
+        /** true=显式清除手工覆盖（区分于「本次没动工时」） */
+        private Boolean hoursCleared;
+        /**
+         * 来源类型（導入會議＝meeting）。只允许 {@code CpmConstants.SOURCE_TYPES} 里的取值；
+         * 与 sourceRef 必须成对，只一半就当手工录入。
+         */
+        @Size(max = 32)
+        private String sourceType;
+        /** 来源对象主键（字符串形状落 source_ref）；重复导入由条目唯一键裁决 */
+        @Size(max = 64)
+        private String sourceRef;
     }
 
     /** 日历登记：type 传 null 表示恢复该天默认口径（周末休/工作日班） */
@@ -223,6 +275,13 @@ public final class CpmWorklogDto {
         private int pEnd;
         private int delta;
         private int hours;
+        /**
+         * 本期加班（已含在 hours 里）。
+         *
+         * <p>汇报页、Markdown 导出与推送文本都读这一个数：三处各自拆就会在
+         * 同一个人身上念出不同的加班量。
+         */
+        private int overtimeHours;
         /** 期内完成时点；非期内完成为 null */
         private String doneAt;
         private int overdueDays;
@@ -238,6 +297,8 @@ public final class CpmWorklogDto {
         private String title;
         private int hue;
         private int hours;
+        /** 本期加班合计（已含在 hours 里） */
+        private int overtimeHours;
         private int avgStart;
         private int avgEnd;
         private int doneCount;

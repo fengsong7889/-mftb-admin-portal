@@ -16,6 +16,7 @@ import org.apache.ibatis.annotations.Update;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 
 /**
@@ -197,4 +198,48 @@ public interface CpmItemMapper extends BaseMapper<CpmItem> {
             + "WHERE id = #{id} AND user_id = #{userId} AND deleted = 0")
     int updateWorkDate(@Param("id") long id, @Param("userId") long userId,
                        @Param("workDate") java.time.LocalDate workDate, @Param("operator") String operator);
+
+    /**
+     * 台账耗时列写入：手工值与「清除覆盖」共用一条 UPDATE。
+     *
+     * <p>走自己的语句而不是塞进 {@code updateLedgerFields}：那条带乐观锁，而工时是投入侧旁路字段，
+     * 不该让「我只改个小时数」与另一端的正文编辑互相顶回草稿（与 {@code updateWorkHoursOwned} 同一理由）。
+     *
+     * <p>必须同时写 {@code work_hours_source}：不写来源就分不清哪个数字是用户量过的、
+     * 哪个是工作日推出来的，台账会失去唯一一条能解释「为什么不是 8 的倍数」的线索。
+     * 传入 NULL + {@code cleared=true} 即退回工作日口径（清列而不是留个 0，0 小时也是一种断言）。
+     */
+    @Update("<script>UPDATE biz_cpm_item SET"
+            + "<choose><when test='cleared'> work_hours = NULL, work_hours_source = 'none',</when>"
+            + "<otherwise> work_hours = #{workHours}, work_hours_source = 'manual',</otherwise></choose>"
+            + " updated_by = #{operator}, updated_at = NOW()"
+            + " WHERE id = #{id} AND user_id = #{userId} AND deleted = 0</script>")
+    int updateLedgerHours(@Param("id") long id, @Param("userId") long userId,
+                          @Param("workHours") java.math.BigDecimal workHours,
+                          @Param("cleared") boolean cleared, @Param("operator") String operator);
+
+    /**
+     * 台账读取时的会议取消对账：把已取消/已释放会议对应的条目落成 cancelled。
+     *
+     * <p>WHERE 带 user_id：只能改自己的条目，即使有人递进别人的 bookingId 也不会跨人写库。
+     * <p>条件里写 {@code status <> 'cancelled'} 而不是先查后改：一次 UPDATE 就是幂等的，
+     * 重复读取不会反复推高 updated_at 把台账改成「今天全部动过」的假象。
+     * <p>不重算 progress：取消一场会不会把已做的 60% 抹掉，那是删事实。
+     */
+    @Update("<script>UPDATE biz_cpm_item SET status = 'cancelled', updated_by = #{operator}, updated_at = NOW() "
+            + "WHERE user_id = #{userId} AND source_type = #{sourceType} AND deleted = 0 "
+            + "AND status &lt;&gt; 'cancelled' AND source_ref IN "
+            + "<foreach item='ref' collection='sourceRefs' open='(' separator=',' close=')'>#{ref}</foreach></script>")
+    int markCancelledBySourceRefs(@Param("userId") long userId, @Param("sourceType") String sourceType,
+                                  @Param("sourceRefs") Collection<String> sourceRefs,
+                                  @Param("operator") String operator);
+
+    /**
+     * 本人在指定来源上的条目（只取对账需要的三列）。
+     *
+     * <p>不按 deleted 过滤以外的条件：对账要看到所有曾经导入过的会，包括已经排到未来或早已完成的。
+     */
+    @Select("SELECT id, source_ref, status FROM biz_cpm_item "
+            + "WHERE user_id = #{userId} AND source_type = #{sourceType} AND deleted = 0")
+    List<CpmItem> listBySource(@Param("userId") long userId, @Param("sourceType") String sourceType);
 }

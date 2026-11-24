@@ -73,6 +73,13 @@ public class CpmSchemaMigrationInitializer implements CommandLineRunner {
     static final String VERSION_WORKLOG_SCHEMA = "cpm:schema:v1.3";
     /** 全局法定名单种子：没有它，每个员工都要自己重标一遍节假日，而工时是全局口径 */
     static final String VERSION_CALENDAR_SEED = "cpm:calendar-seed:v1.0";
+    /**
+     * 来源 CHECK 加 meeting（導入會議）。
+     *
+     * <p>单独开一个版本位而不是改 v1.2：v1.2 已在开发库/生产库记过账，改它的 task
+     * 存量环境不会重跑，新取值永远进不了 CHECK——界面导得出、写库报错。
+     */
+    static final String VERSION_SOURCE_MEETING = "cpm:schema:v1.4";
 
     private static final String SCHEMA_SCRIPT = "336_cpm_core.sql";
     private static final String TIME_SCHEMA_SCRIPT = "337_cpm_time_schema.sql";
@@ -162,6 +169,7 @@ public class CpmSchemaMigrationInitializer implements CommandLineRunner {
         versionTracker.applyOnce(VERSION_REVISION, this::doRevisionSchema, this::verifyRevisionSchema);
         versionTracker.applyOnce(VERSION_WORKLOG_SCHEMA, this::doWorklogSchema, this::verifyWorklogSchema);
         versionTracker.applyOnce(VERSION_CALENDAR_SEED, this::doCalendarSeed, this::verifyCalendarSeed);
+        versionTracker.applyOnce(VERSION_SOURCE_MEETING, this::doSourceMeetingExpand, this::verifySourceMeetingExpand);
         syncMenuVisibility();
     }
 
@@ -509,8 +517,44 @@ public class CpmSchemaMigrationInitializer implements CommandLineRunner {
         }
     }
 
-    /* ==================== 阶段三 7. 汇报正式版本 ==================== */
+    /* ==================== 台账 9. 来源 CHECK 加 meeting ==================== */
 
+    /**
+     * 只放宽 {@code ck_cpm_item_source} 一条：加 meeting 一个取值（導入會議）。
+     *
+     * <p>不顺手重跑 v1.2 的三条 CHECK：那两条已经进账且未被本轮改动，重跑只会多两次
+     * DROP/ADD 的元数据锁；而且「改一个约束就重跑整个步骤」会把不相关的表一起拖进风险里。
+     *
+     * <p>取值仍由 {@link CpmConstants#SOURCE_TYPES} 拼出，不在这手写第二份字面量：
+     * 白名单与约束必须同一真源，否则界面能选、写库报错。
+     */
+    private void doSourceMeetingExpand() {
+        if (checkConstraintExists("biz_cpm_item", "ck_cpm_item_source")) {
+            jdbcTemplate.execute("ALTER TABLE biz_cpm_item DROP CHECK ck_cpm_item_source");
+        }
+        jdbcTemplate.execute("ALTER TABLE biz_cpm_item ADD CONSTRAINT ck_cpm_item_source CHECK (source_type IN ("
+                + quotedList(CpmConstants.SOURCE_TYPES) + "))");
+        log.info("持續績效来源 CHECK 已放宽: {}", CpmConstants.SOURCE_TYPES);
+    }
+
+    /**
+     * 校验必须实查 CHECK_CLAUSE：约束存在但仍是旧五项时，meeting 写库照样被打回，
+     * 却会被记成「已迁移」——比没记更危险（同 v1.2 复盘）。
+     */
+    private void verifySourceMeetingExpand() {
+        if (!CpmConstants.SOURCE_TYPES.contains(CpmConstants.SOURCE_MEETING)) {
+            throw new IllegalStateException("SOURCE_TYPES 未登记 meeting，DDL 与白名单已经分叉");
+        }
+        String clause = checkClauseOf("biz_cpm_item", "ck_cpm_item_source");
+        for (String source : CpmConstants.SOURCE_TYPES) {
+            if (!clause.contains("'" + source + "'")) {
+                throw new IllegalStateException("ck_cpm_item_source 仍未包含 " + source
+                        + "，该来源（如導入會議）写库会直接报數據庫操作異常");
+            }
+        }
+    }
+
+    /* ==================== 阶段三 7. 汇报正式版本 ==================== */
     /**
      * 版本表建表 + 汇报/推送记录补列 + 复合外键。
      *

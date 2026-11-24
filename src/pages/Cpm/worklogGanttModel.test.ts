@@ -11,6 +11,7 @@ import i18n from '@/i18n'
 import {
   HOURS_PER_DAY, buildRange, dayBadge, dayType, fmt, hoursInPeriod, isRestDay, loadData,
   mondayOf, overlaps, progressColor, setDayType, taskHours, taskStatus, weekName, weekdayShort, workdayCount,
+  TASK_STATUS_META,
   type GanttData,
 } from './worklogGanttModel'
 
@@ -172,5 +173,30 @@ describe('存量数据兼容', () => {
     const loaded = loadData()
     expect(Array.isArray(loaded.groups)).toBe(true)
     expect(loaded.groups.length).toBeGreaterThan(0)
+  })
+})
+
+describe('耗时手改与来源已取消', () => {
+  const base = { id: 't', title: '行', start: MON, end: '2026-11-18', progress: 40, note: '' }
+
+  it('无覆盖值时耗时就是工作日 × 8h（跨周末不算）', () => {
+    expect(taskHours(base as never, EMPTY)).toBe(3 * HOURS_PER_DAY)
+    // 同一行跨到周末：多出来的两三天不能算工时
+    expect(taskHours({ ...base, end: SUN } as never, EMPTY)).toBe(5 * HOURS_PER_DAY)
+  })
+
+  it('手工值优先，且不参与工作日换算：填 3 就是 3', () => {
+    expect(taskHours({ ...base, hoursOverride: 3 } as never, EMPTY)).toBe(3)
+    // 区间工时不拆日：把 3h 按工作日比例劈成「今天 1h」是编出来的数字
+    expect(hoursInPeriod({ ...base, hoursOverride: 3 } as never, MON, SUN, EMPTY)).toBe(3)
+    // 与本期完全不相交的行不该算进本期
+    expect(hoursInPeriod({ ...base, hoursOverride: 3 } as never, '2026-12-01', '2026-12-07', EMPTY)).toBe(0)
+  })
+
+  it('已取消优先于进度定状态，并多出一档可筛', () => {
+    expect(taskStatus({ ...base, progress: 100, cancelled: true } as never)).toBe('cancelled')
+    expect(taskStatus(base as never)).toBe('doing')
+    // 状态档位只能从 TASK_STATUS_META 单一源派生：筛选项、表头、图例、导出都读这一份
+    expect(Object.keys(TASK_STATUS_META)).toEqual(['done', 'doing', 'todo', 'plan', 'cancelled'])
   })
 })

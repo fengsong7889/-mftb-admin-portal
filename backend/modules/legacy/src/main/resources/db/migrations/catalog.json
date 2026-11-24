@@ -4488,6 +4488,21 @@
       "author": "Qoder",
       "ticket": "cpm-worklog-ledger",
       "comment": "由系统铺而不是让用户自己标：工时是全局口径，法定假日对所有人一致，不铺则每个员工都要重标当年节假日，漏标的人周报数字就是错的。用 INSERT IGNORE 而不是先查后插——uk_cpm_calendar_day 已锁住「同人同日」，重复启动只会被唯一键挡回，不会盖掉运维后来改过的名单。只铺当年：跨年由下一年的独立版本位补，改写本条会让已记录 v1.0 的环境不再重跑、永远缺新一年名单。后置校验数 user_id=0 的行数不少于节假日条数。"
+    }    ,
+    {
+      "versionKey": "cpm:schema:v1.4",
+      "module": "cpm",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "cpmSchemaMigrationInitializer",
+      "status": "ACTIVE",
+      "dependencies": [
+        "cpm:schema:v1.3"
+      ],
+      "intent": "biz_cpm_item 的 ck_cpm_item_source 扩一个取值 meeting（導入會議：一场会 = 一条带计划起止的子任務）",
+      "author": "Qoder",
+      "ticket": "cpm-worklog-meeting-import",
+      "comment": "meeting 与既有 meeting_action 刻意分成两个取值：行动项是「会上分给我的那件事」（带完成时限，单日），会议本体是「那段时间本身」（带预定起止，区间）。合成一个取值就会让 uk_cpm_item_source 把「导入这场会」与「导入会里某个行动项」判成同一件事，第二样永远导不进去；而两种日期语义挤进同一个 dueDate 字段后，界面无法解释导入后为什么多出两个日期。刻意不重跑 v1.2 的三条 CHECK：那两条已进账且本轮未改，重跑只会多两次 DROP/ADD 元数据锁，并把不相关的表一起拖进风险。取值真源仍是 CpmConstants.SOURCE_TYPES（校验与 DDL 同源）；后置校验实查 information_schema 的 CHECK_CLAUSE——约束存在但仍是旧五项时记成已迁移，比没记更危险。"
     }
   ]
 }

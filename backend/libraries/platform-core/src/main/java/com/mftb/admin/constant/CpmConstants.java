@@ -117,11 +117,20 @@ public final class CpmConstants {
      */
     public static final String SOURCE_RDM_TASK = "rdm_task";
     public static final String SOURCE_MEETING_ACTION = "meeting_action";
+    /**
+     * 会议本体（導入會議）：一行 = 一场我为之留了时间的会。
+     *
+     * <p>与 {@link #SOURCE_MEETING_ACTION} 分开而不是同一个值：行动项是「会上分给我的那件事」
+     * （带截止日），会议本体是「那段时间本身」（带起止）。合成一个取值就会让唯一键
+     * {@code uk_cpm_item_source} 把「导入这场会」与「导入会里的某个行动项」当成同一件事，
+     * 第二样永远导不进去。新增取值必须走 {@code cpm:schema:v1.4} 扩 CHECK，否则界面导得出、写库报错。
+     */
+    public static final String SOURCE_MEETING = "meeting";
 
     /** 来源取值集合唯一真源（同上：校验与 DDL CHECK 同源） */
     public static final java.util.SortedSet<String> SOURCE_TYPES =
             java.util.Collections.unmodifiableSortedSet(new java.util.TreeSet<>(java.util.Arrays.asList(
-                    SOURCE_MANUAL, SOURCE_AI, SOURCE_RDM, SOURCE_RDM_TASK, SOURCE_MEETING_ACTION)));
+                    SOURCE_MANUAL, SOURCE_AI, SOURCE_RDM, SOURCE_RDM_TASK, SOURCE_MEETING_ACTION, SOURCE_MEETING)));
 
     /* ==================== RDM 回写结果（biz_cpm_item.rdm_sync_state） ==================== */
 
@@ -191,6 +200,17 @@ public final class CpmConstants {
     /** 每个工作日折算工时（小时）。界面、汇报、导出共用这一个常数；改它等于改所有人的周报数字 */
     public static final int WORKLOG_HOURS_PER_DAY = 8;
 
+    /**
+     * 单条子任務手工耗时的绝对上限基数（小时／工作日）。
+     *
+     * <p>正常口径是 {@link #WORKLOG_HOURS_PER_DAY}，但加班是真实投入：把上限钉在 8h
+     * 会让人无法记录「一个工作日干了 12 小时」，只能去拉长排期凑工作日数——那等于
+     * 逼用户伪造排期。24h 回答的是「一天最多装得下多少」，不是鼓励值。
+     * <p>上限按工作日数而不是自然日数：周末与节假日本来就不在岗，把它们算进上限
+     * 就等于承认「七天连轴」是正常安排。前端 {@code hoursCap()} 与本常量同源。
+     */
+    public static final int WORKLOG_HOURS_CAP_PER_DAY = 24;
+
     /** 计划属性：期初已排期 */
     public static final String PLAN_TYPE_PLANNED = "planned";
     /** 计划属性：计划冻结后临时安排进来的工作，周会要单独能念出来 */
@@ -223,6 +243,30 @@ public final class CpmConstants {
 
     /** 台账子任务的默认分类：台账界面不提供分类选择，写死 general 避免把用户输入当白名单绕过口 */
     public static final String LEDGER_CATEGORY = "general";
+
+    /**
+     * 台账耗时列的来源标记取值（写进 {@code biz_cpm_item.work_hours_source}）。
+     *
+     * <p>台账只认 {@link #WORKLOG_HOURS_SOURCE_MANUAL} 作为手工覆盖。{@link #WORKLOG_HOURS_SOURCE_SEGMENT}
+     * 是时段回算的精确合计，同一列但不同语义：把打卡合计当作计划值，同一条子任務在台账
+     * 与记时面板就会各种出一套工时。{@link #WORKLOG_HOURS_SOURCE_NONE} 代表「没估过」
+     * 而不是「估了 0」—— 0 小时本身是一个断言，不能拿它当默认值。
+     */
+    public static final String WORKLOG_HOURS_SOURCE_MANUAL = "manual";
+    public static final String WORKLOG_HOURS_SOURCE_SEGMENT = "segment";
+    public static final String WORKLOG_HOURS_SOURCE_NONE = "none";
+
+    /**
+     * 单条子任務工时的存储天花板（小时）：对齐列宽 {@code DECIMAL(4,1)} 可存的合理区间。
+     *
+     * <p>它不是业务上限：业务上限是 {@code CpmWorkdays.hoursCap(工作日数)}（× 24h），
+     * 本常量只在其上再封一层，防止一个跳半年的任务算出六千多小时后在写库时撞截断错误。
+     * 超限现在拒写而不静默夹紧：静默改用户输入会让人以为保存成功，存的却不是他填的数。
+     */
+    public static final int WORKLOG_HOURS_MAX = 999;
+
+    /** 导入会议取消对账一次读回的最大行数：一人不会有一千场导入过的会，超出即视为异常拉量 */
+    public static final int MEETING_RECONCILE_MAX = 500;
 
     /** 工作項色相下标上限（与前端 GROUP_COLORS 长度同源，超出即取模而不是报错） */
     public static final int GROUP_HUE_MAX = 6;

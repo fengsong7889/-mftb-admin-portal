@@ -257,7 +257,7 @@
   --wg-req: 148px;
   --wg-task: 210px;
   --wg-date: 116px;
-  --wg-hours: 78px;
+  --wg-hours: 104px;
   --wg-prog: 128px;
   --wg-status: 84px;
   --wg-note: 208px;
@@ -479,12 +479,395 @@
 }
 .wg-c--task { width: var(--wg-task); gap: 4px; }
 .wg-c--start, .wg-c--end { width: var(--wg-date); justify-content: center; }
-.wg-c--hours { width: var(--wg-hours); justify-content: flex-end; font-variant-numeric: tabular-nums; color: var(--text-1); }
+.wg-c--hours { width: var(--wg-hours); justify-content: flex-end; font-variant-numeric: tabular-nums; color: var(--text-1); cursor: pointer; }
 .wg-c--prog { width: var(--wg-prog); gap: 6px; cursor: pointer; }
-.wg-c--status { width: var(--wg-status); justify-content: center; }
+/* 状态列除了标签还可能出现 RDM 回写徽标，改成左对齐带间距并允许换行，避免徽标被固定宽度掉 */
+.wg-c--status { width: var(--wg-status); justify-content: flex-start; align-items: center; gap: 4px; flex-wrap: wrap; }
 .wg-c--note { width: var(--wg-note); cursor: pointer; }
 .wg-c--note:hover .wg-note-text {
   color: var(--brand);
+}
+
+/* ---- 耗时列：可编辑提示与手改标记 ---- */
+
+/* 虚下划线只给「能改」这个信息，不改变字色：这一列本来就要读数字，色改了就分不清口径了 */
+.wg-c--hours:hover span {
+  text-decoration: underline dashed;
+  text-underline-offset: 3px;
+}
+/* 手工值与自动值必须一眼分得开：否则周会念到 12h 会以为是 1.5 个工作日算出来的 */
+.wg-c--edited span {
+  color: var(--brand);
+  font-weight: 600;
+}
+/* 加班角标：它跟着「合计」而不是「正常」，所以不能继承手工值的橙色加粗（那会让人把
+   +4h 读成另一个工时数字）；也不拿红色——加班不是错误，红色会和超限提示撞车 */
+.wg-c--hours .wg-hours-overtime {
+  flex: none;
+  margin-left: 4px;
+  padding: 0 4px;
+  font-size: 11px;
+  line-height: 15px;
+  font-weight: 500;
+  color: var(--warning-deep);
+  background: color-mix(in srgb, var(--warning-deep) 12%, transparent);
+  border-radius: 3px;
+}
+.wg-c--hours:hover .wg-hours-overtime {
+  text-decoration: none;
+}
+.wg-c--muted span {
+  color: var(--text-3);
+  font-weight: 400;
+}
+
+.wg-hours-pop {
+  width: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.wg-hours-pop__current {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--text-2);
+}
+.wg-hours-pop__mode {
+  color: var(--text-3);
+}
+.wg-hours-pop__input {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+/* InputNumber 一旦传了 suffix，antd 会在外层再包一层 affix-wrapper；
+   它是 inline-flex 的 shrink-to-fit 盒子，只给里层写 flex:1 会被钳成内容宽度
+   （就是之前“数字 + 单位看不清”的根因），所以两层都要显式满宽。 */
+.wg-hours-pop__input .ant-input-number-affix-wrapper {
+  flex: 1;
+  width: 100%;
+  min-width: 0;
+}
+.wg-hours-pop__input .ant-input-number {
+  width: 100%;
+}
+/* 单位取弱化令牌 + 12px（AGENTS「配置参数单位置于输入框后方」），不引入裸色 */
+.wg-hours-pop__unit {
+  font-size: 12px;
+  color: var(--text-3);
+}
+.wg-hours-pop__reset {
+  align-self: flex-start;
+  padding-inline: 0;
+}
+.wg-hours-pop__hint {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-3);
+}
+/* 超限提示：报错色只给文字与输入框描边，不给背景（弹层里整块发红会让人以为已经提交失败） */
+.wg-hours-pop__error {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--danger);
+}
+/* 加班拆分行：正常/加班两个数必须同屏读完，分成两行就会有人只读到合计那一个。
+   整句走一个 i18n key：拆成三段拼会在英文/日文里把语序弄坏 */
+.wg-hours-pop__split {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-2);
+}
+
+/* ---- 進度列弹层：更新区 + 逐周轨迹区 ---- */
+
+.wg-prog-pop {
+  width: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+/* 「目前最新」是弹层唯一可操作的主角：大字 + 品牌色，与只读快照拉开层级 */
+.wg-prog-pop__live {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--text-2);
+}
+.wg-prog-pop__live b {
+  font-size: 20px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+/* 「往期快照」只读历史上下文：冷色（info→purple）与「目前最新」的品牌橙拉开时态层级；
+   左轨 + tinted 图标 + 迷你进度条让它一眼是「归档卡片」而不是可操作区。
+   不带任何可提交控件，写明提交只会记录到今天。 */
+.wg-snap {
+  position: relative;
+  display: flex;
+  overflow: hidden;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--info) 22%, var(--border-2));
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--info) 9%, var(--surface-2)) 0%,
+    var(--surface-2) 55%,
+    color-mix(in srgb, var(--purple) 6%, var(--surface-2)) 100%
+  );
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--surface-2) 70%, transparent);
+}
+.wg-snap__rail {
+  flex: none;
+  width: 3px;
+  background: linear-gradient(180deg, var(--info), var(--purple));
+}
+.wg-snap__body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 10px;
+}
+.wg-snap__head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.wg-snap__icon {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  color: var(--info);
+  background: color-mix(in srgb, var(--info) 14%, transparent);
+}
+.wg-snap__title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-2);
+}
+.wg-snap__period {
+  font-style: normal;
+  margin-left: auto;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 11px;
+  color: var(--text-3);
+  background: color-mix(in srgb, var(--surface-3) 80%, transparent);
+  border: 1px solid var(--border-1);
+  white-space: nowrap;
+}
+.wg-snap__value {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.wg-snap__value b {
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--info);
+  font-variant-numeric: tabular-nums;
+}
+.wg-snap__bar {
+  flex: 1;
+  height: 4px;
+  border-radius: 3px;
+  background: var(--surface-3);
+  overflow: hidden;
+}
+.wg-snap__bar i {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: linear-gradient(90deg, var(--info), var(--purple));
+}
+.wg-snap__note {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--text-3);
+}
+.wg-prog-history {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-1);
+}
+.wg-prog-history--empty {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-3);
+}
+.wg-prog-history__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--text-2);
+}
+.wg-prog-history__delta {
+  font-style: normal;
+  color: var(--text-3);
+}
+.wg-prog-history__delta.is-up {
+  color: var(--success);
+}
+.wg-prog-history__delta.is-down {
+  color: var(--danger);
+}
+/* 固定高度 + 向下滚动：默认落在最新一期，更早的周向上滚。
+   长周期（跨月/跨年）不会撑高弹层：视口封顶、内部滚动，条数不设硬上限。 */
+.wg-prog-history__scroll {
+  max-height: 150px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--text-3) 35%, transparent) transparent;
+}
+.wg-prog-history__scroll::-webkit-scrollbar {
+  width: 6px;
+}
+.wg-prog-history__scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.wg-prog-history__scroll::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--text-3) 35%, transparent);
+  border-radius: 3px;
+}
+.wg-prog-history__scroll::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--text-3) 55%, transparent);
+}
+/* 历史各期＝次要：小字、弱色、细轨，退到背景里 */
+.wg-prog-history__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 6px;
+  border-radius: 6px;
+  font-size: 11px;
+  color: var(--text-3);
+}
+/* 最新一期＝主角：暖色归档卡 + 粗体品牌色数字 + 日期胶囊，一眼聚焦 */
+.wg-prog-history__row.is-current {
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--brand) 10%, var(--surface-2)), var(--surface-2));
+  border: 1px solid color-mix(in srgb, var(--brand) 28%, var(--border-2));
+  font-size: 12px;
+  color: var(--text-2);
+}
+.wg-prog-history__week {
+  flex: none;
+  width: 58px;
+  white-space: nowrap;
+}
+.wg-prog-history__row.is-current .wg-prog-history__week {
+  font-weight: 700;
+  color: var(--text-1);
+}
+/* 过去周期视图下「正在查看的那一期」冷色描边：与最新一期的暖色区分开 */
+.wg-prog-history__row.is-viewing {
+  outline: 1px solid var(--info);
+  outline-offset: -1px;
+}
+.wg-prog-history__row.is-viewing .wg-prog-history__week {
+  color: var(--info);
+}
+.wg-prog-history__track {
+  flex: 1;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--surface-3);
+  overflow: hidden;
+}
+.wg-prog-history__track > i {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--text-3) 40%, transparent);
+}
+.wg-prog-history__row.is-current .wg-prog-history__track {
+  height: 6px;
+  border-radius: 3px;
+}
+.wg-prog-history__row.is-current .wg-prog-history__track > i {
+  border-radius: 3px;
+  background: linear-gradient(90deg, var(--brand), var(--brand-hover));
+}
+.wg-prog-history__num {
+  flex: none;
+  width: 38px;
+  text-align: right;
+  /* <b> 默认 700 会让历史各期和最新一期一样重；历史压到 500 才退得下去 */
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.wg-prog-history__row.is-current .wg-prog-history__num {
+  width: 44px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--brand);
+}
+.wg-prog-history__date {
+  flex: none;
+  width: 40px;
+  text-align: right;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+/* 最新一期的日期做成胶囊标签，与「往期快照」的周期 pill 统一视觉语言 */
+.wg-prog-history__date--pill {
+  width: auto;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 10px;
+  color: var(--brand);
+  background: color-mix(in srgb, var(--brand) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--brand) 30%, var(--border-2));
+  white-space: nowrap;
+}
+.wg-prog-history__now {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--warning-deep);
+}
+
+/* ---- 已取消：色条降为描边，不删行也不参与进度色阶 ---- */
+
+/* 已取消只换掉 --bar-color：色条底/描边/填充/百分比字色全部由它派生，
+   重写单一变量而不是逐条盖 background，才能跟主题令牌一起翻深浅（也不靠 !important 压优先级） */
+.wg-bar--cancelled {
+  --bar-color: var(--text-3);
+  border-style: dashed;
+  opacity: 0.7;
+}
+/* 取消不代表没排过期：保留色条长度与位置（仍是当周排期事实），但百分比不再是注意力中 心 */
+.wg-bar--cancelled .wg-bar__chip,
+.wg-bar--cancelled .wg-bar__chip-out {
+  color: var(--text-3);
+}
+.wg-lg-cancelled {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  border: 1px dashed var(--border-2);
+  background: color-mix(in srgb, var(--text-3) 16%, var(--surface-2));
 }
 
 .wg-task__grip {
@@ -1146,7 +1529,7 @@
     --wg-req: 110px;
     --wg-task: 150px;
     --wg-date: 92px;
-    --wg-hours: 60px;
+    --wg-hours: 84px;
     --wg-prog: 96px;
     --wg-status: 70px;
     --wg-note: 140px;

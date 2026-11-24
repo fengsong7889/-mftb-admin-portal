@@ -242,6 +242,21 @@ public class CpmController {
         return Result.success(sourceService.listRdmTasks(keyword));
     }
 
+    /**
+     * 本人参与或组织的未取消会议清单（導入會議）。
+     *
+     * <p>门禁与其余候选档同一口径（cpm-my:view）：这扇清单只读、只列，真正写库仍走台账写入，
+     * 而写入面已经收敛在自己的归属人条件里，不在这里扩第二次权。
+     * <p>与会议行动项分列：行动项带回一个截止日，会议带回一段起止，两种日期语义不能共行。
+     */
+    @GetMapping("/sources/meetings")
+    @RequirePermission(menu = MY, action = CpmConstants.ACTION_VIEW)
+    public Result<List<CpmDto.MeetingSourceVO>> meetingSources(@RequestParam(required = false) String keyword,
+                                                              HttpServletResponse response) {
+        noStore(response);
+        return Result.success(sourceService.listMeetings(keyword));
+    }
+
     /* ==================== 我的匯報 ==================== */
 
     @GetMapping("/reports/preview")

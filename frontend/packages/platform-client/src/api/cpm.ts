@@ -639,6 +639,39 @@ export function fetchCpmSourceMeetingActions(): Promise<CpmSourceVO[]> {
 }
 
 /**
+ * 未取消会议候选（導入會議用）。
+ *
+ * <p>与行动项档分开而不是合入一个接口：行动项的日期口径是「完成时限」（单日），
+ * 而会议本身占着一整段预定时间，导入后要做的是甘特的<b>计划起止</b>；
+ * 合成一档就会在一个列表里出现两种日期语义。
+ *
+ * <p>候选范围（我组织 + 我参会，含未开始与已结束）与「哪些算未取消」全部由服务端
+ * 会议域端口按登录态判定；前端不传身份字段。导入后会议才被取消的联动不在这里判，
+ * 那是台账读取时的对账职责。
+ */
+export interface CpmMeetingSourceVO {
+  /** 会议 biz_meeting_booking.id，导入后落 source_ref */
+  bookingId: number
+  bookingNo: string
+  title: string
+  /** 预定开始（ISO 白日期时间）：导入后作为子任務的计划起日 */
+  startTime: string
+  /** 预定结束（ISO 白日期时间）：导入后作为子任務的计止日 */
+  endTime: string
+  /** booked / checked_in / finished；cancelled 与 released 不会出现在候选里 */
+  statusCode: string
+  /** organizer=我发起的，participant=我参与的 */
+  role: 'organizer' | 'participant'
+  roomName?: string | null
+  /** 本人是否已导入过该会议（真防重仍靠条目唯一键） */
+  imported?: boolean
+}
+
+export function fetchCpmSourceMeetings(keyword?: string): Promise<CpmMeetingSourceVO[]> {
+  return request.get<unknown, CpmMeetingSourceVO[]>('/cpm/sources/meetings', { params: keyword ? { keyword } : {} })
+}
+
+/**
  * 本人相关的未结案 RDM <b>任务</b>（阶段三）。
  *
  * 与需求档分开而不是合并：只有任务级关联具备进度回写落点，需求档是只读关联。

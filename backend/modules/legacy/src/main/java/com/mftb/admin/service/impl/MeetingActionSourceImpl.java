@@ -8,6 +8,7 @@
 package com.mftb.admin.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.mftb.admin.constant.MeetingConstants;
 import com.mftb.admin.entity.MeetingBooking;
 import com.mftb.admin.entity.MeetingMinutesItem;
 import com.mftb.admin.entity.MeetingMinutesItemOwner;
@@ -20,6 +21,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -96,5 +98,55 @@ public class MeetingActionSourceImpl implements MeetingActionSource {
                 titles.put(booking.getId(), StringUtils.hasText(booking.getTitle())
                         ? booking.getTitle() : booking.getBookingNo()));
         return titles;
+    }
+
+    /* ==================== 導入會議候选与状态对账（持續績效消费） ==================== */
+
+    /**
+     * 候选清单：本人参与或发起的未取消会议。
+     *
+     * <p>身份判定只走 {@code biz_meeting_attendee} JOIN（组织者同样落一行），所以这里不再
+     * 补一次 organizer_id OR：两处条件必会在「代订」「转组织者」这类场景上飘开。
+     *
+     * <p>我组织/我参会直接用 {@code organizer_id} 比对本人心跳：这一行已经
+     * SELECT 出来了，为它再查一次参会表只多一次往返，不多一分真相。
+     */
+    @Override
+    public List<MeetingRef> findUncancelledMeetingsOf(long userId, String keyword, int limit) {
+        List<MeetingBooking> rows = bookingMapper.findInvolvedExcludingStatuses(
+                userId,
+                StringUtils.hasText(keyword) ? keyword.trim() : null,
+                MeetingConstants.NON_DELIVERABLE_STATUSES,
+                Math.max(1, Math.min(limit, 50)));
+        List<MeetingRef> out = new ArrayList<>();
+        for (MeetingBooking b : rows) {
+            if (!StringUtils.hasText(b.getTitle()) || b.getStartTime() == null || b.getEndTime() == null) {
+                // 计列起止是导入的全部意义：缺任一时间的脏单不开放导入，
+                // 否则用户拿到一条永远落在「待排期」档的子任務还以为是自己的错
+                continue;
+            }
+            out.add(new MeetingRef(b.getId(), b.getBookingNo(), b.getTitle(),
+                    b.getStartTime(), b.getEndTime(), b.getStatus(),
+                    Long.valueOf(userId).equals(b.getOrganizerId()),
+                    StringUtils.hasText(b.getRoomName()) ? b.getRoomName() : null));
+        }
+        return out;
+    }
+
+    /**
+     * 状态对账用：一次批量读，不在台账循环里逐条查（一场一人可能有几十条导入记录）。
+     *
+     * <p>已软删的会议不返回：它已经不是任何人的事实了，把导入条目标成「已取消」
+     * 会让人以为会是自己乱删的；宁愿它停在导入那一刻的状态。
+     */
+    @Override
+    public Map<Long, String> findBookingStatuses(Collection<Long> bookingIds) {
+        if (bookingIds == null || bookingIds.isEmpty()) {
+            return Map.of();
+        }
+        Map<Long, String> statuses = new HashMap<>();
+        bookingMapper.selectBatchIds(bookingIds).forEach(
+                booking -> statuses.put(booking.getId(), booking.getStatus()));
+        return statuses;
     }
 }

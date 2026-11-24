@@ -6,7 +6,8 @@
  * 完整许可条款见仓库根目录 LICENSE 文件。
  */
 import request from '@/api/request'
-import type { GanttData, GanttGroup, GanttTask } from './worklogGanttModel'
+import type { CpmRdmSyncVO } from '@/api/cpm'
+import type { GanttData, GanttGroup, GanttTask, PeriodProgressKind } from './worklogGanttModel'
 import type { WorkReport as WorkReportShape } from './worklogReport'
 
 /**
@@ -29,10 +30,23 @@ interface TaskDTO {
   start?: string | null
   end?: string | null
   progress: number
+  /** 服务端按查询周期算好的期初/期末快照；旧后端缺省时适配层回落当前值 */
+  periodStartProgress?: number
+  periodProgress?: number
+  periodProgressKind?: PeriodProgressKind
+  latestProgressAt?: string | null
   note?: string | null
   planType?: 'planned' | 'inserted'
   insertedAt?: string | null
   hours: number
+  /** 本期加班（服务端由合计减工作日 × 8h 派生）；旧后端未回传时按 0 读 */
+  overtimeHours?: number
+  /** 手工耗时覆盖值；null=沿用工作日口径（服务端 work_hours 且 source=manual 时回传） */
+  hoursOverride?: number | null
+  /** 来源已取消（会议）：服务端台账读取时对账得出，界面不得自己推 */
+  cancelled?: boolean
+  /** RDM 回写状态（只有关联 RDM 任務的行非空）：台账不重造一份回写视图 */
+  rdmSync?: CpmRdmSyncVO | null
   periodHours: number
   workdays: number
   state: string
@@ -75,10 +89,17 @@ function toTask(t: TaskDTO): GanttTask {
     start: t.start ?? null,
     end: t.end ?? null,
     progress: t.progress,
+    periodStartProgress: t.periodStartProgress,
+    periodProgress: t.periodProgress,
+    periodProgressKind: t.periodProgressKind,
+    latestProgressAt: t.latestProgressAt ?? null,
     note: t.note ?? '',
     history: t.history?.map(h => ({ at: h.at, progress: h.progress })),
     planType: t.planType ?? 'planned',
     insertedAt: t.insertedAt ?? null,
+    hoursOverride: t.hoursOverride ?? null,
+    cancelled: t.cancelled ?? false,
+    rdmSync: t.rdmSync ?? null,
   }
 }
 
@@ -127,6 +148,19 @@ export interface TaskForm {
   note?: string
   planType?: 'planned' | 'inserted'
   insertedAt?: string | null
+  /**
+   * 手工耗时覆盖（小时）。缺省/null = 不改动，沿用「工作日 × 8h」计算值；
+   * 传 0 以上即表示用户手改过。服务端落 biz_cpm_item.work_hours（source=manual）。
+   */
+  hours?: number | null
+  /** 显式清除手工覆盖，回到工作日口径（与 start/end 的 clear 标志位同一形态） */
+  hoursCleared?: boolean
+  /**
+   * 来源对象（導入會議/关联导入用）：服务端与 source_ref 成对写入，
+   * 重复导入由 uk_cpm_item_source 裁决；手工录入不传（保持 null）。
+   */
+  sourceType?: string | null
+  sourceRef?: string | null
 }
 
 export function createGroup(form: { title: string; hue?: number }): Promise<GroupDTO> {
@@ -189,6 +223,8 @@ export interface ReportRowDTO {
   pEnd: number
   delta: number
   hours: number
+  /** 本期加班（已含在 hours 里），服务端算 */
+  overtimeHours?: number
   doneAt?: string | null
   overdueDays: number
   planType: 'planned' | 'inserted'
@@ -202,6 +238,8 @@ export interface ReportGroupDTO {
   title?: string | null
   hue: number
   hours: number
+  /** 本工作項的本期加班合计 */
+  overtimeHours?: number
   avgStart: number
   avgEnd: number
   doneCount: number
@@ -214,7 +252,7 @@ export interface ReportDTO {
   end: string
   totals: {
     total: number; done: number; doing: number; pending: number; inserted: number
-    backlog: number; risks: number; hours: number; avgProgress: number; avgStart: number; avgEnd: number
+    backlog: number; risks: number; hours: number; overtimeHours?: number; avgProgress: number; avgStart: number; avgEnd: number
   }
   groups: ReportGroupDTO[]
   risks: ReportRowDTO[]
@@ -243,6 +281,7 @@ export function toWorkReport(dto: ReportDTO): WorkReportShape {
     },
     group: { id: String(r.groupId ?? 0), title: r.groupTitle ?? '', hue: 0, tasks: [] },
     pStart: r.pStart, pEnd: r.pEnd, delta: r.delta, hours: r.hours,
+    overtime: r.overtimeHours ?? 0,
     doneAt: r.doneAt ?? null, overdueDays: r.overdueDays,
   })
   return {
@@ -252,11 +291,11 @@ export function toWorkReport(dto: ReportDTO): WorkReportShape {
     groups: dto.groups.map(g => ({
       group: { id: String(g.groupId), title: g.title ?? '', hue: g.hue, tasks: [] },
       rows: g.rows.map(row),
-      hours: g.hours, avgStart: g.avgStart, avgEnd: g.avgEnd, doneCount: g.doneCount,
+      hours: g.hours, overtime: g.overtimeHours ?? 0, avgStart: g.avgStart, avgEnd: g.avgEnd, doneCount: g.doneCount,
     })),
     totals: {
       done: dto.totals.done, inProgress: dto.totals.doing, avgStart: dto.totals.avgStart, avgEnd: dto.totals.avgEnd,
-      hours: dto.totals.hours, risks: dto.totals.risks, backlog: dto.totals.backlog,
+      hours: dto.totals.hours, overtimeHours: dto.totals.overtimeHours ?? 0, risks: dto.totals.risks, backlog: dto.totals.backlog,
       total: dto.totals.total, inserted: dto.totals.inserted,
     },
     outputs: [],

@@ -90,13 +90,13 @@ describe('语言包落地', () => {
   it('状态与特殊日期标签表切语言立刻换词（模块级常量表必须用 getter）', async () => {
     const twLabels = (Object.keys(TASK_STATUS_META) as (keyof typeof TASK_STATUS_META)[]).map(k => TASK_STATUS_META[k].label)
     const twTypes = SPECIAL_DAY_TYPES.map(x => x.label)
-    expect(twLabels).toEqual(['已完成', '進行中', '待處理', '待排期'])
+    expect(twLabels).toEqual(['已完成', '進行中', '待處理', '待排期', '已取消'])
     expect(twTypes).toEqual(['節假日', '補班', '調休', '請假'])
 
     await i18n.changeLanguage('en')
     const enLabels = (Object.keys(TASK_STATUS_META) as (keyof typeof TASK_STATUS_META)[]).map(k => TASK_STATUS_META[k].label)
     const enTypes = SPECIAL_DAY_TYPES.map(x => x.label)
-    expect(enLabels).toEqual(['Done', 'In progress', 'Pending', 'Unscheduled'])
+    expect(enLabels).toEqual(['Done', 'In progress', 'Pending', 'Unscheduled', 'Cancelled'])
     expect(enTypes).toEqual(['Holiday', 'Makeup shift', 'Comp leave', 'Leave'])
     // 兜底防线：语言包缺词时 t() 会返回 key 本身，界面就会显示 "cpm.gantt.dayType.holiday"
     expect([...enLabels, ...enTypes].some(v => v.includes('cpm.'))).toBe(false)

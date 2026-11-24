@@ -102,6 +102,34 @@ public interface MeetingBookingMapper extends BaseMapper<MeetingBooking> {
                                           @Param("from") LocalDateTime from,
                                           @Param("to") LocalDateTime to);
 
+    /**
+     * 本人参与或发起的<b>未取消</b>会议（持續績效「導入會議」候选，倒序取最近若干场）。
+     *
+     * <p>同样走 {@code biz_meeting_attendee} JOIN而不是 organizer_id OR 判断：组织者也会
+     * 落一行 attendee_type=organizer，一条 JOIN 就覆盖两种身份（与 findUserSchedule 同口径）。
+     *
+     * <p>刻意不带日期窗口：导入既要看未开始的会，也要补录上周开完的会。只排今天以后，
+     * 就等于禁止事后补记，而补记恰恰是台账最常见的用法。
+     *
+     * <p>排除的是 cancelled 与 released：前者是人为取消，后者是未到场被系统释放，
+     * 两者实质都是「这场会没发生」，都不构成可导入的工作事实。取值真值见
+     * {@code MeetingConstants.NON_DELIVERABLE_STATUSES}，不在这重复列一份名单。
+     *
+     * <p>取最新 N 场而不是全量：候选面板是人挑的清单，不是报表；上限由调用夹紧。
+     */
+    @Select("<script>SELECT b.* FROM biz_meeting_booking b "
+            + "JOIN biz_meeting_attendee a ON a.booking_id = b.id AND a.deleted = 0 AND a.user_id = #{userId} "
+            + "WHERE b.deleted = 0 AND b.status NOT IN "
+            + "<foreach item='s' collection='excludedStatuses' open='(' separator=',' close=')'>#{s}</foreach> "
+            + "<if test='keyword != null and keyword != \"\"'>"
+            + "AND (b.title LIKE CONCAT('%', #{keyword}, '%') OR b.booking_no LIKE CONCAT('%', #{keyword}, '%')) "
+            + "</if>"
+            + "ORDER BY b.start_time DESC LIMIT #{limit}</script>")
+    List<MeetingBooking> findInvolvedExcludingStatuses(@Param("userId") long userId,
+                                                       @Param("keyword") String keyword,
+                                                       @Param("excludedStatuses") List<String> excludedStatuses,
+                                                       @Param("limit") int limit);
+
     /** 指定房间的未来占用数：删除会议室前的守卫（有未结束的占用不允许删） */
     @Select("SELECT COUNT(*) FROM biz_meeting_booking WHERE deleted = 0 "
             + "AND room_id = #{roomId} AND status IN ('booked','checked_in') AND end_time > NOW()")

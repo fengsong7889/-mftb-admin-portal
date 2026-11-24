@@ -6,7 +6,7 @@
  * 完整许可条款见仓库根目录 LICENSE 文件。
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { I18nextProvider } from 'react-i18next'
@@ -35,6 +35,7 @@ vi.mock('@/api/cpm', () => ({
   fetchCpmSourceRdm: vi.fn(),
   fetchCpmSourceRdmTasks: vi.fn(),
   fetchCpmSourceMeetingActions: vi.fn(),
+  fetchCpmSourceMeetings: vi.fn(),
   fetchCpmTemplates: vi.fn(),
   fetchCpmCurrent: vi.fn(),
   fetchCpmPreview: vi.fn(),
@@ -78,16 +79,45 @@ vi.mock('@/api/cpm', () => ({
 }))
 
 import * as cpmApi from '@/api/cpm'
-/* 2026-11 台账迁服务端后的挂载点说明：
- * 旧的过渡页面 WorklogDailyFlow / ReportWorkspace 已删除，能力并回统一视图的两个标签：
- * cpm-my 的「日视图」= WorklogDayView（条目/记时/关联导入/RDM 回写/AI 整理），
- * cpm-report 的「發布與交付」= ReportDeliveryPanel（草稿/发布/修订/日报投影/Word）。
- * 用例按组件挂载，断言一条不删、口径一条不放宽。 */
-import WorklogDayView from './WorklogDayView'
+/* 2026-11 取消「工作台账 / 日视图」两个 tab 后的挂载点说明：
+ * 日视图（WorklogDayView）已删除——台账就是唯一录入面，AI 助手／关联合入／导入会议／
+ * 记时／RDM 回写徽标全部并进了台账行内与功能区。旧过渡页 WorklogDailyFlow / ReportWorkspace
+ * 也早已删除，cpm-report 的「發布與交付」= ReportDeliveryPanel。
+ *
+ * 台账读取走的是 './worklogApi'（它自己再调 @/api/request），所以整层换成内存夹具：
+ * 本文件钉的是「前端不自己算数字、写动作全部递交服务端」这一层契约，
+ * 台账接口的真实形状由后端 CpmWorklogLedgerTest 钉住。放它去打 8080，
+ * jsdom 里没有登录态，红了只会是 401 而不是契约变了。 */
+const ledgerStub = vi.hoisted(() => ({
+  current: { groups: [] as unknown[], holidays: [] as string[], makeup: [] as string[], compOff: [] as string[], leave: [] as string[] },
+}))
+vi.mock('./worklogApi', async importOriginal => {
+  const actual = await importOriginal<typeof import('./worklogApi')>()
+  return {
+    ...actual,
+    fetchLedger: vi.fn(async () => ({
+      data: ledgerStub.current, rangeStart: null, rangeEnd: null, hasUngrouped: false,
+    })),
+    createGroup: vi.fn(async () => ({ id: 90, title: '', hue: 0, sortOrder: 0, tasks: [] })),
+    createTask: vi.fn(async () => ({ id: 91 })),
+    updateTask: vi.fn(async () => ({})),
+    updateGroup: vi.fn(async () => ({})),
+    deleteTask: vi.fn(async () => undefined),
+    deleteGroup: vi.fn(async () => undefined),
+    restoreTask: vi.fn(async () => undefined),
+    restoreGroup: vi.fn(async () => undefined),
+    reorderGroups: vi.fn(async () => undefined),
+    importLocalLedger: vi.fn(async () => ({ groups: 0, tasks: 0, skippedGroups: 0, skippedTasks: 0, calendarDays: 0 })),
+  }
+})
+import WorklogGantt from './WorklogGantt'
 import ReportDeliveryPanel from './ReportDeliveryPanel'
 import TeamReport from './TeamReport'
 import ReportDetail from './ReportDetail'
 import AiAssistantDrawer from './AiAssistantDrawer'
+import * as ledgerApi from './worklogApi'
+import { mondayOf } from './worklogGanttModel'
+import dayjs from 'dayjs'
 
 /**
  * CPM 阶段二冒烟测试：交互契约钉死（快捷录入/延续/发布确认/AI 预览确认/催办）。
@@ -116,6 +146,28 @@ const ITEM = {
 }
 
 const CARRY = { ...ITEM, id: 2, title: '跨週期方案推進', status: 'doing', progress: 40, recognized: true }
+
+/** 本周一为锚的计划区间：台账默认档是「本週」，写死日期或用 UTC 今天都会在换周/周末时整块查不到行 */
+const today = mondayOf(dayjs()).format('YYYY-MM-DD')
+
+/**
+ * 台账行夹具：字段与 TaskVO 同形，因为页面读的就是这个形状。
+ *
+ * <p>不自己拼进度/状态：台账的状态与工时都是服务端给的（state/hours/hoursOverride），
+ * 前端测试里一旦开始本地推导，就测不到「数字不自己算」这条契约。
+ */
+const ledgerRow = (over: Record<string, unknown> = {}) => ({
+  id: '1', title: '已完成的事', start: today, end: today, progress: 100, note: '',
+  planType: 'planned', insertedAt: null, hours: 8, hoursOverride: null, cancelled: false,
+  periodHours: 8, workdays: 1, state: 'done', history: [{ at: today, progress: 100 }],
+  // 周期快照由服务端回传：测试夹具也必须按同一契约给值，不能让页面偷偷回本地推导
+  periodStartProgress: 100, periodProgress: 100, periodProgressKind: 'period', latestProgressAt: today,
+  sourceType: 'manual', sourceRef: null, rdmSync: null, ...over,
+})
+const ledgerWith = (...rows: Record<string, unknown>[]) => ({
+  groups: [{ id: '7', title: '外売頻道優化', hue: 0, tasks: rows }],
+  holidays: [], makeup: [], compOff: [], leave: [],
+})
 
 /**
  * 时段 store：模拟「写完立刻读得到」的服务端（同事务 read-your-write）。
@@ -172,14 +224,17 @@ beforeEach(async () => {
   vi.clearAllMocks()
   timeStore = []
   publishedNow = false
+  // 台账默认只有一行手工条目；需要 rdm_task 来源、已取消等分支的用例自己覆盖 ledgerStub.current
+  ledgerStub.current = ledgerWith(ledgerRow())
   mock.fetchCpmTemplates.mockResolvedValue(TEMPLATE)
-  // 日视图一次带回条目 + 当日时段：拆成逐条目请求会把打开日视图变成小型请求风暴
   mock.fetchCpmDay.mockImplementation(async () => ({
     date: '2026-11-18', items: [ITEM], carryCandidates: [CARRY],
     times: timeStore.length
       ? [{ itemId: 1, segments: timeStore, dayMinutes: timeStore.reduce((sum, row) => sum + row.durationMinutes, 0) }]
       : [],
   }))
+  // 台账行内记时是开弹层才拉时段（一次拉整条目的，再按今天筛）：返回全部由组件自己过滤
+  mock.fetchCpmTimeEntries.mockImplementation(async () => timeStore)
   mock.createCpmItem.mockResolvedValue(ITEM)
   mock.carryCpmItem.mockResolvedValue(undefined)
   mock.fetchCpmSourceRdm.mockResolvedValue([
@@ -190,6 +245,8 @@ beforeEach(async () => {
     { sourceType: 'rdm_task', sourceRef: '7001', title: '實現多幣種拆單計價引擎', subtitle: 'TASK-2026-0701', externalNo: 'TASK-2026-0701', parentTitle: '多幣種結算', statusCode: 'developing', role: 'dev', progress: 40, dueDate: '2026-11-25', terminated: false, imported: false, prdTask: true, planHours: 16 },
   ])
   mock.fetchCpmSourceMeetingActions.mockResolvedValue([])
+  // 導入會議候选默认为空：需要钉会议行的用例自己覆盖（不靠夹具里留一份 fake 会议）
+  mock.fetchCpmSourceMeetings.mockResolvedValue([])
   mock.addCpmProgress.mockResolvedValue(undefined)
   mock.deleteCpmItem.mockResolvedValue(undefined)
   mock.createCpmTimeEntry.mockImplementation(async (itemId: number, form: { workDate: string; durationMinutes: number; note?: string }) => {
@@ -246,81 +303,86 @@ beforeEach(async () => {
   mock.confirmCpmAi.mockResolvedValue([ITEM])
 })
 
-describe('P1 我的工作記錄（真实契约）', () => {
-  it('加载日视图：条目、延续建议、认定徽章都按服务端数据渲染', async () => {
-    mount(<MemoryRouter><WorklogDayView /></MemoryRouter>)
+describe('P1 我的工作記錄（台账单一视图·真实契约）', () => {
+  it('台账读取只进服务端：行、金额typed 都按 Ledger 渲染，不拉日视图接口', async () => {
+    mount(<MemoryRouter><WorklogGantt /></MemoryRouter>)
     expect(await screen.findByText('已完成的事')).toBeTruthy()
-    expect(screen.getByText('跨週期方案推進')).toBeTruthy()
-    expect(screen.getByText('已認定')).toBeTruthy()
-    // 数字不前端造：日视图接口带当天日期参数
-    expect(mock.fetchCpmDay).toHaveBeenCalled()
+    expect(ledgerApi.fetchLedger).toHaveBeenCalled()
+    // 日视图已经没了：fetchCpmDay 不应再被台账调用（两处各读一份就会两套数字）
+    expect(mock.fetchCpmDay).not.toHaveBeenCalled()
   })
 
-  it('快捷录入回车调用 create 且不本地拼装状态', async () => {
-    const user = userEvent.setup()
-    mount(<MemoryRouter><WorklogDayView /></MemoryRouter>)
-    const input = await screen.findByPlaceholderText(/回車即存/)
-    await user.type(input, '測試快捷錄入{enter}')
-    await waitFor(() => expect(mock.createCpmItem).toHaveBeenCalledTimes(1))
-    const payload = mock.createCpmItem.mock.calls[0][0]
-    expect(payload.title).toBe('測試快捷錄入')
-    expect(payload.sourceType).toBe('manual')
-  })
-
-  it('延续建议点击走 carry 接口（不本地复制条目）', async () => {
-    const user = userEvent.setup()
-    mount(<MemoryRouter><WorklogDayView /></MemoryRouter>)
-    const chip = await screen.findByText('跨週期方案推進')
-    await user.click(chip)
-    await waitFor(() => expect(mock.carryCpmItem).toHaveBeenCalledWith(2))
-  })
-
-  it('删除必须经二次确认，确认后调用 delete', async () => {
-    const user = userEvent.setup()
-    mount(<MemoryRouter><WorklogDayView /></MemoryRouter>)
+  /**
+   * 本轮用户明确删掉的两件：快捷录入输入框与「未完结→带入今天」引导。
+   * 不钉一条“它们不在”，下次某个迭代很容易把它们当成体验优化又加回来。
+   */
+  it('快捷录入与延续带入横幅都已下线：台账本身就是录入面', async () => {
+    mount(<MemoryRouter><WorklogGantt /></MemoryRouter>)
     await screen.findByText('已完成的事')
-    const deleteButtons = screen.getAllByText('刪除')
-    await user.click(deleteButtons[0])
-    expect(await screen.findAllByText('確定刪除該條工作記錄？')).toBeTruthy()
-    await user.click(screen.getByRole('button', { name: '確認刪除' }))
-    await waitFor(() => expect(mock.deleteCpmItem).toHaveBeenCalledWith(1))
+    expect(screen.queryByPlaceholderText(/回車即存/)).toBeNull()
+    expect(screen.queryByText(/未完結，點擊帶入今天/)).toBeNull()
+    expect(screen.queryByText('跨週期方案推進')).toBeNull()
   })
 
-  it('工时 chip 仅在模板开启时出现，随进度一起提交（不跳编辑页）', async () => {
+  it('删除走二次确认，确认后递交服务端而不是本地删行', async () => {
     const user = userEvent.setup()
-    // 研发模板 workHoursEnabled=true：同一份页面代码要能按模板开关显隐工时入口
-    mock.fetchCpmTemplates.mockResolvedValue([{
-      ...TEMPLATE[0], templateKey: 'dev', name: '研發工程師', workHoursEnabled: true,
-      categories: [{ key: 'dev', label: '開發', hint: null }],
-    }])
-    mount(<MemoryRouter><WorklogDayView /></MemoryRouter>)
+    const { container } = mount(<MemoryRouter><WorklogGantt /></MemoryRouter>)
     await screen.findByText('已完成的事')
-    await user.click(screen.getAllByRole('button', { name: /更新進度/ })[0])
-    await user.click(await screen.findByText('2h'))
-    await user.click(screen.getByRole('button', { name: /保存更新/ }))
-    await waitFor(() => expect(mock.addCpmProgress).toHaveBeenCalledTimes(1))
-    const payload = mock.addCpmProgress.mock.calls[0][1]
-    expect(payload.workHours).toBe(2)
-    // 夹具条目本身就是 done：状态沿用原值，进度由「done 即 100」这条口径推出，前端不自己算
-    expect(payload.status).toBe('done')
-    expect(payload.progress).toBe(100)
-  })
+    // 锁行内那颗删除图标按钮：功能区/弹层里都可能出现其他 delete 图标，按名字取第一个会误命中
+    await user.click(container.querySelector('.wg-row__ops .anticon-delete')!.closest('button')!)
+    expect((await screen.findAllByText('確定刪除該子任務？')).length).toBeGreaterThan(0)
+    await user.click(screen.getByRole('button', { name: /確\s*認\s*刪\s*除/ }))
+    await waitFor(() => expect(ledgerApi.deleteTask).toHaveBeenCalledWith(1))
+  }, 20000)
 
-  it('关联导入：候选来自服务端，已导入行禁用按钮，導入按来源对象建条目', async () => {
+  /**
+   * 耗时列的三条硬约束：默认走工作日口径、点得开弹层、手改值递交服务端。
+   * 「恢復自動」必须传 hoursOverride=null，否则前端只能拿一个大数字盖住原口径，
+   * 服务端就永远分不清这行是用户量过的还是算出来的。
+   */
+  it('耗时列点击弹层：默认显示工作日口径，手填与清除覆盖都走 updateTask', async () => {
     const user = userEvent.setup()
-    mount(<MemoryRouter><WorklogDayView /></MemoryRouter>)
+    const { container } = mount(<MemoryRouter><WorklogGantt /></MemoryRouter>)
+    await screen.findByText('已完成的事')
+    // 锁定耗时单元格本身而不是里面的数字：保存后数字就变了，拿旧数字定位第二次的点击会自带断言
+    const hoursCell = () => container.querySelector<HTMLElement>('.wg-c--hours')!
+    await user.click(hoursCell())
+    // 档位与输入框同时在：只给输入框会让「一个工作日」这种常见值也要敲字
+    expect(await screen.findByText('16h')).toBeTruthy()
+    const input = screen.getByRole('spinbutton')
+    await user.clear(input)
+    await user.type(input, '3')
+    await user.click(screen.getByRole('button', { name: /保\s*存/ }))
+    await waitFor(() => expect(ledgerApi.updateTask).toHaveBeenCalled())
+    const payload = (ledgerApi.updateTask as ReturnType<typeof vi.fn>).mock.calls.at(-1)![1]
+    expect(payload.hours).toBe(3)
+    expect(payload.hoursCleared).toBe(false)
+    // 保存后弹层必须自己收起：留着它，下一次点单元格会变成「关掉」而不是「打开」
+    await waitFor(() => expect(document.querySelector('.ant-popover:not(.ant-popover-hidden)')).toBeNull())
+
+    // 清除覆盖：回到工作日口径靠显式 hoursCleared，不靠“不传字段”（不传等于本次没动）
+    await user.click(hoursCell())
+    await user.click(await screen.findByRole('button', { name: /恢復自動/ }))
+    await waitFor(() => {
+      const last = (ledgerApi.updateTask as ReturnType<typeof vi.fn>).mock.calls.at(-1)![1]
+      expect(last.hours).toBeNull()
+      expect(last.hoursCleared).toBe(true)
+    })
+  }, 30000)
+
+  it('关联导入从台账功能区发起：候选来自服务端，已导入行禁用，導入按来源对象建条目', async () => {
+    const user = userEvent.setup()
+    mount(<MemoryRouter><WorklogGantt /></MemoryRouter>)
     await screen.findByText('已完成的事')
     await user.click(screen.getByRole('button', { name: /關聯導入/ }))
     expect(await screen.findByText('需求甲：结算改造')).toBeTruthy()
     // 已导入的行只可能由服务端 imported 标记驱动，前端不自行去重
     expect(screen.getByRole('button', { name: /已導入/ })).toBeDisabled()
-    // 结案来源带「來源已結案」提示，未结案的不带
     expect(screen.getByText('來源已結案')).toBeTruthy()
     // antd 把两字文案插空格、图标 aria-label 进可及名，且工具栏「關聯導入」也含「導入」二字，
     // 因此必须锚定成「import 图标 + 導入」这一颗行内按钮，不能靠模糊匹配取第一个
     const importButtons = screen.getAllByRole('button', { name: /^import導\s*入$/ })
     expect(importButtons).toHaveLength(1)
-    expect(importButtons[0]).toBeEnabled()
     await user.click(importButtons[0])
     await waitFor(() => expect(mock.createCpmItem).toHaveBeenCalledTimes(1))
     const payload = mock.createCpmItem.mock.calls[0][0]
@@ -328,61 +390,98 @@ describe('P1 我的工作記錄（真实契约）', () => {
     expect(payload.sourceRef).toBe('501')
     expect(payload.sourceLabel).toBe('REQ-2026-0501')
     expect(payload.title).toBe('需求甲：结算改造')
-    // 建完条目要回刷日视图，否则用户看不到刚导入的行
-    await waitFor(() => expect(mock.fetchCpmDay.mock.calls.length).toBeGreaterThan(1))
-  })
+    // 建完条目要重拉台账，否则用户看不到刚导入的行
+    await waitFor(() => expect((ledgerApi.fetchLedger as ReturnType<typeof vi.fn>).mock.calls.length).toBeGreaterThan(1))
+  }, 30000)
 
-  it('记时：写的是时段表，不伪造一次进度更新', async () => {
+  it('导入会议：候选并入关联导入面板，导入时计划起止取会议起止并落未分组', async () => {
     const user = userEvent.setup()
-    mount(<MemoryRouter><WorklogDayView /></MemoryRouter>)
+    mock.fetchCpmSourceMeetings.mockResolvedValue([
+      { bookingId: 88, bookingNo: 'MT20261124001', title: '结算方案评审', startTime: `${today}T10:00`, endTime: `${today}T11:30`, statusCode: 'booked', role: 'organizer', roomName: '會議室 A', imported: false },
+    ])
+    mount(<MemoryRouter><WorklogGantt /></MemoryRouter>)
     await screen.findByText('已完成的事')
-    await user.click(screen.getByRole('button', { name: /記時/ }))
-    expect(await screen.findByText('今天還沒有投入時段')).toBeTruthy()
+    // 功能区只留一颗「關聯導入」：会议本体与行动项是同一面板里的两个档，不再各占一颗按钮
+    expect(screen.queryByRole('button', { name: /導入會議/ })).toBeNull()
+    await user.click(screen.getByRole('button', { name: /關聯導入/ }))
+    const bookingTab = [...document.querySelectorAll('.ant-segmented-item')]
+      .find(node => node.textContent?.includes('會議本體'))
+    expect(bookingTab).toBeTruthy()
+    await user.click(bookingTab!)
+    expect(await screen.findByText('结算方案评审')).toBeTruthy()
+    await user.click(screen.getByRole('button', { name: /^import導\s*入$/ }))
+    await waitFor(() => expect(ledgerApi.createTask).toHaveBeenCalled())
+    const payload = (ledgerApi.createTask as ReturnType<typeof vi.fn>).mock.calls[0][0]
+    expect(payload.sourceType).toBe('meeting')
+    expect(payload.sourceRef).toBe('88')
+    // 计划起止就是会议起止那天：不让用户导入后再手工填两个日期
+    expect(payload.start).toBe(today)
+    expect(payload.end).toBe(today)
+    // 导入落未分组：自动同名建工作項会把用户自建分组污染成会议流水账
+    expect(payload.groupId).toBeNull()
+    // 候选一律由服务端给：界面不再按状态自己筛一遍（两处裁判必出一处错）
+    expect(mock.fetchCpmSourceMeetings).toHaveBeenCalled()
+  }, 30000)
 
-    const minutes = await screen.findByPlaceholderText(/耗時\(分\)/)
-    await user.click(screen.getByRole('button', { name: /添加時段/ }))
-    // 起止与耗时都没填：不能凭空造一段 0 分钟的投入
-    await waitFor(() => expect(mock.createCpmTimeEntry).not.toHaveBeenCalled())
-    expect(mock.addCpmProgress).not.toHaveBeenCalled()
-
-    await user.clear(minutes)
-    await user.type(minutes, '90')
-    await user.click(screen.getByRole('button', { name: /添加時段/ }))
-    await waitFor(() => expect(mock.createCpmTimeEntry).toHaveBeenCalledTimes(1))
-    expect(mock.createCpmTimeEntry.mock.calls[0][0]).toBe(1)
-    expect(mock.createCpmTimeEntry.mock.calls[0][1]).toMatchObject({ workDate: expect.any(String), durationMinutes: 90 })
-    // 记时是独立事实：它绝不该顺手改进度，否则「补时间」会变成「伪造一次状态跃迁」
-    expect(mock.addCpmProgress).not.toHaveBeenCalled()
-    expect(await screen.findByText(/今天 1 小時 30 分/)).toBeTruthy()
-    expect(document.querySelectorAll('.cpm-time__row').length).toBe(1)
-  }, 20000)
-
-  it('标记已取消：CHECK 放宽后照常走后端，条目进已取消组并默认折叠', async () => {
+  /**
+   * 进度列联动契约：列/色条读服务端 periodProgress，弹层编辑读 progress。
+   *
+   * <p>夹具故意给两个不同值：只要页面仍显示 50% 且弹层滑块是 80%，就证明它没有
+   * 拿当前值覆盖历史档，也没有在前端重算流水。
+   */
+  it('进度列读服务端期末快照，弹层仍编辑当前真实值并显示往期快照', async () => {
     const user = userEvent.setup()
-    // 保存前后返回不同状态：模拟「服务端接受 cancelled」这一事实，而不是前端本地改色
-    let cancelled = false
-    mock.fetchCpmDay.mockImplementation(async () => ({
-      date: '2026-11-18', items: [{ ...ITEM, status: cancelled ? 'cancelled' : 'done' }], carryCandidates: [], times: [],
+    ledgerStub.current = ledgerWith(ledgerRow({
+      progress: 80,
+      periodProgress: 50,
+      periodProgressKind: 'period',
+      latestProgressAt: dayjs(today).add(7, 'day').format('YYYY-MM-DD'),
+      history: [{ at: today, progress: 50 }, { at: dayjs(today).add(7, 'day').format('YYYY-MM-DD'), progress: 80 }],
     }))
-    mock.addCpmProgress.mockImplementation(async () => { cancelled = true })
-    mount(<MemoryRouter><WorklogDayView /></MemoryRouter>)
+    const { container } = mount(<MemoryRouter><WorklogGantt /></MemoryRouter>)
+    await waitFor(() => expect(container.querySelector('.wg-prog-num')?.textContent).toBe('50%'))
+    await user.click(container.querySelector<HTMLElement>('.wg-c--prog')!)
+    const popover = document.querySelector('.ant-popover:not(.ant-popover-hidden)') as HTMLElement
+    expect(within(popover).getByText('目前最新')).toBeTruthy()
+    expect(popover.querySelector('.wg-prog-pop__live b')?.textContent).toBe('80%')
+    expect(within(popover).getByText('往期快照')).toBeTruthy()
+    expect(popover.querySelector('.wg-snap__value b')?.textContent).toBe('50%')
+  }, 30000)
+
+  it('最新一笔就在当前查询周期时，往期快照卡不重复出现', async () => {
+    const user = userEvent.setup()
+    ledgerStub.current = ledgerWith(ledgerRow({
+      progress: 80,
+      periodProgress: 80,
+      periodProgressKind: 'period',
+      latestProgressAt: today,
+      history: [{ at: today, progress: 80 }],
+    }))
+    const { container } = mount(<MemoryRouter><WorklogGantt /></MemoryRouter>)
+    await waitFor(() => expect(container.querySelector('.wg-prog-num')?.textContent).toBe('80%'))
+    await user.click(container.querySelector<HTMLElement>('.wg-c--prog')!)
+    const popover = document.querySelector('.ant-popover:not(.ant-popover-hidden)') as HTMLElement
+    expect(within(popover).getByText('目前最新')).toBeTruthy()
+    expect(within(popover).queryByText('往期快照')).toBeNull()
+  }, 30000)
+
+  /**
+   * 已取消只来自来源会议（本轮用户定的口径）：台账不再给任意行一个手写 cancelled 的入口。
+   * 服务端标为 cancelled 的行必须显示已取消、并且不进待完成统计。
+   */
+  it('来源已取消的行：状态显示已取消，不再计入待完成', async () => {
+    ledgerStub.current = ledgerWith(ledgerRow({ progress: 60, state: 'cancelled', cancelled: true }))
+    mount(<MemoryRouter><WorklogGantt /></MemoryRouter>)
     await screen.findByText('已完成的事')
-    await user.click(screen.getAllByRole('button', { name: /更新進度/ })[0])
-    const option = [...document.querySelectorAll('.ant-segmented-item')]
-      .find(node => node.textContent?.includes('已取消'))
-    expect(option).toBeTruthy()
-    await user.click(option!)
-    await user.click(screen.getByRole('button', { name: /保存更新/ }))
-    // cancelled 已是后端合法枚举：预览时代「不写库」的分支必须删干净，否则用户以为取消成功了
-    await waitFor(() => expect(mock.addCpmProgress).toHaveBeenCalledTimes(1))
-    expect(mock.addCpmProgress.mock.calls[0][1].status).toBe('cancelled')
-    await waitFor(() => expect(screen.getByText('已取消')).toBeTruthy())
-    expect(screen.getByText('1 條')).toBeTruthy()
+    expect(screen.getAllByText('已取消').length).toBeGreaterThan(0)
+    // 不再让前端自己拼状态：没有进度弹层里的「已取消」选项，人为取消只能来自来源
+    expect(screen.queryByText('待處理')).toBeNull()
+    expect(screen.getByText(/1\s*項已取消/)).toBeTruthy()
   }, 20000)
 
   it('RDM 任务档：候选是任务口径，且只有任务档给回写开关', async () => {
     const user = userEvent.setup()
-    mount(<MemoryRouter><WorklogDayView /></MemoryRouter>)
+    mount(<MemoryRouter><WorklogGantt /></MemoryRouter>)
     await screen.findByText('已完成的事')
     await user.click(screen.getByRole('button', { name: /關聯導入/ }))
     const taskTab = [...document.querySelectorAll('.ant-segmented-item')]
@@ -404,26 +503,27 @@ describe('P1 我的工作記錄（真实契约）', () => {
     expect(payload.sourceType).toBe('rdm_task')
     expect(payload.sourceRef).toBe('7001')
     expect(payload.rdmSyncEnabled).toBe(true)
-  }, 20000)
+  }, 30000)
 
-  it('回写开关与重新對齊各走各的接口（关掉不等于对齐）', async () => {
+  it('回写徽标已并入台账行：开关与重新對齊各走各的接口（关掉不等于对齐）', async () => {
     const user = userEvent.setup()
-    mock.fetchCpmDay.mockResolvedValue({
-      date: '2026-11-18',
-      items: [{ ...ITEM, sourceType: 'rdm_task', sourceRef: '7001', rdmSync: { enabled: true, state: 'conflict', message: 'RDM 已被他人上報到 70%', taskNo: 'TASK-2026-0701', taskId: 7001, rdmProgress: 70 } }],
-      carryCandidates: [], times: [],
-    })
-    mount(<MemoryRouter><WorklogDayView /></MemoryRouter>)
+    ledgerStub.current = ledgerWith(ledgerRow({
+      sourceType: 'rdm_task', sourceRef: '7001',
+      rdmSync: { enabled: true, state: 'conflict', message: 'RDM 已被他人上報到 70%', taskNo: 'TASK-2026-0701', taskId: 7001, rdmProgress: 70 },
+    }))
+    mount(<MemoryRouter><WorklogGantt /></MemoryRouter>)
     const badge = await screen.findByRole('button', { name: /RDM 有變更/ })
     await user.click(badge)
     // 冲突必须看得见：徽标是这条链路唯一的失败出口
     expect(await screen.findByText(/RDM 已被他人上報到 70%/)).toBeTruthy()
     // 先关开关再点对齊：「重新對齊」会把浮层关掉，之后再点开关会撞上 pointer-events:none
-    await user.click(screen.getByRole('switch'))
+    // 开关必须锁定在徽标弹层里：功能区本来就有甘特/顯示周末两枚 switch，全局取会误命中
+    const popover = document.querySelector('.ant-popover:not(.ant-popover-hidden)') as HTMLElement
+    await user.click(within(popover).getByRole('switch'))
     await waitFor(() => expect(mock.setCpmRdmSync).toHaveBeenCalledWith(1, false))
     await user.click(screen.getByRole('button', { name: /以 RDM 當前值重新對齊/ }))
     await waitFor(() => expect(mock.realignCpmRdmSync).toHaveBeenCalledWith(1))
-  }, 20000)
+  }, 30000)
 
   /**
    * 浏览器走查（2026-11-19）发现的缺陷回归：总闸 `cpm.rdm-sync-enabled` 默认 false 时，
@@ -433,19 +533,17 @@ describe('P1 我的工作記錄（真实契约）', () => {
    */
   it('总闸关闭时徽标说「系統未開啟回寫」，不再停在未回寫', async () => {
     mock.fetchCpmRdmSyncStatus.mockResolvedValue({ enabled: false })
-    mock.fetchCpmDay.mockResolvedValue({
-      date: '2026-11-18',
-      items: [{ ...ITEM, sourceType: 'rdm_task', sourceRef: '7001', rdmSync: { enabled: true, state: 'pending', message: null, taskId: 7001, taskNo: 'TASK-2026-0701' } }],
-      carryCandidates: [], times: [],
-    })
+    ledgerStub.current = ledgerWith(ledgerRow({
+      sourceType: 'rdm_task', sourceRef: '7001',
+      rdmSync: { enabled: true, state: 'pending', message: null, taskId: 7001, taskNo: 'TASK-2026-0701' },
+    }))
     const user = userEvent.setup()
-    mount(<MemoryRouter><WorklogDayView /></MemoryRouter>)
+    mount(<MemoryRouter><WorklogGantt /></MemoryRouter>)
     const badge = await screen.findByRole('button', { name: /系統未開啟回寫/ })
     await user.click(badge)
     expect(await screen.findByText(/運維尚未在服務端開啟 RDM 回寫總閘/)).toBeTruthy()
   }, 20000)
 })
-
 describe('P3 我的匯報（真实契约）', () => {
   it('进入即请求 current 呈现确定性初稿', async () => {
     mount(<MemoryRouter><ReportDeliveryPanel /></MemoryRouter>)

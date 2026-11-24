@@ -9,6 +9,7 @@ package com.mftb.admin.service.cpm;
 
 import com.mftb.admin.common.BusinessException;
 import com.mftb.admin.constant.CpmConstants;
+import com.mftb.admin.constant.MeetingConstants;
 import com.mftb.admin.dto.CpmWorklogDto;
 import com.mftb.admin.entity.CpmItem;
 import com.mftb.admin.entity.CpmItemUpdate;
@@ -19,18 +20,25 @@ import com.mftb.admin.mapper.CpmItemMapper;
 import com.mftb.admin.mapper.CpmItemUpdateMapper;
 import com.mftb.admin.mapper.CpmWorkCalendarMapper;
 import com.mftb.admin.mapper.CpmWorklogGroupMapper;
+import com.mftb.admin.service.MeetingActionSource;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 
 /**
  * 工作台账服务：工作項 × 子任務（= biz_cpm_item）× 计划排期 × 进度流水 × 工时口径日历。
@@ -64,6 +72,13 @@ public class CpmWorklogService {
     private final CpmAccessGuard guard;
     /** 「今天」只从业务时区取：服务器时区与业务时区不一致时，跨零点用户会被算进昨天 */
     private final CpmPeriods periods;
+    /**
+     * 会议域只读端口：导入会议后的「会被取消」对账只能走它。
+     *
+     * <p>不直接注入 MeetingBookingMapper：那会把 cpm 绑上会议表结构，会议改列时
+     * 台账会静默错判哪些会已取消（同 CpmSourceService 走端口的理由）。
+     */
+    private final MeetingActionSource meetingActions;
 
     /* ==================== 读取 ==================== */
 
@@ -82,6 +97,17 @@ public class CpmWorklogService {
         }
         LocalDate readFrom = from != null ? from : currentPeriodAnchor().minusDays(READ_BACK_DAYS);
         LocalDate readTo = to != null ? to : currentPeriodAnchor();
+        /**
+         * 进度流水的读取窗口与查询窗口解耦。
+         *
+         * <p>流水在台账里有两个消费者，它们要的区间不是一个东西：汇报的期初/期末快照要的是
+         * 「本期收在哪里」（必须跟查询窗口，否则周报数字会跟着筛选档飘）；而进度弹层里的
+         * 逐周轨迹要的是「这条子任务从开始到现在推过几次」。两者共用查询窗口时，默认的
+         * 「本週」档会把历史剪成一期——用户看到的不是「这周推了多少」，而是「只有本周」，
+         * 那个功能就白做了。日历仍按 readFrom/readTo 取（工时口径属于本期）。
+         */
+        LocalDate historyFrom = currentPeriodAnchor().minusDays(READ_BACK_DAYS);
+        LocalDate historyTo = currentPeriodAnchor();
         CpmWorkdays.Ledger calendar = workdays.load(current.getId(), readFrom, readTo);
 
         Map<Long, List<CpmItem>> byGroup = new LinkedHashMap<>();
@@ -93,8 +119,9 @@ public class CpmWorklogService {
                 byGroup.computeIfAbsent(item.getGroupId(), k -> new ArrayList<>()).add(item);
             }
         }
-        Map<Long, List<CpmWorklogDto.HistoryVO>> trails = trails(current.getId(), readFrom, readTo);
-
+        Map<Long, List<CpmWorklogDto.HistoryVO>> trails = trails(current.getId(), historyFrom, historyTo);
+        // 导入后会议被取消的对账：必须在拼 VO 之前做，否则同一份台账里会一半新一一半旧
+        reconcileCancelledMeetings(current);
         CpmWorklogDto.LedgerVO vo = new CpmWorklogDto.LedgerVO();
         vo.setRangeStart(from == null ? null : from.toString());
         vo.setRangeEnd(to == null ? null : to.toString());
@@ -228,18 +255,25 @@ public class CpmWorklogService {
         item.setProgress(progress);
         // 归属日取计划起日，未排期取今天：汇报按 work_date 分组，两处口径必须同一句话
         item.setWorkDate(start != null ? start : currentPeriodAnchor());
-        item.setSourceType(CpmConstants.SOURCE_MANUAL);
+        // 来源成对写入（導入會議）：只一半就当手工录入，否则留下有 type 无 ref 的孤儿关联
+        applySource(item, form.getSourceType(), form.getSourceRef());
         item.setGroupId(resolveGroupId(form.getGroupId(), current));
         item.setPlanStart(start);
         item.setPlanEnd(end);
         item.setPlanType(planType);
         item.setInsertedAt(insertedAtOf(planType, form.getInsertedAt(), currentPeriodAnchor()));
         applyNote(item, form.getNote());
+        applyHours(item, form.getHours(), false, current.getId());
         item.setVersion(0);
         item.setDeleted(0);
         item.setCreatedBy(current.getName());
         item.setUpdatedBy(current.getName());
-        itemMapper.insert(item);
+        try {
+            itemMapper.insert(item);
+        } catch (DuplicateKeyException e) {
+            // uk_cpm_item_source 是重复导入的唯一裁判：两个标签页同时点「導入」不该长出两行
+            throw new BusinessException("該對象已導入過，請直接在台账中查找它");
+        }
         appendTrail(item, current);
         return taskVO(item, workdays.load(current.getId(), itemPeriodFrom(item), currentPeriodAnchor().plusYears(1)),
                 null, null, Map.of());
@@ -288,6 +322,13 @@ public class CpmWorklogService {
             if (fresh.getPlanStart() != null && !fresh.getPlanStart().equals(item.getWorkDate())) {
                 itemMapper.updateWorkDate(id, current.getId(), fresh.getPlanStart(), current.getUsername());
             }
+        }
+        // 耗时单独一条 UPDATE：它不参与乐观锁，也不能因为改个小时数就把正文的 version 推高
+        if (form.getHours() != null || Boolean.TRUE.equals(form.getHoursCleared())) {
+            CpmItem target = itemMapper.selectAliveById(id);
+            applyHours(target, form.getHours(), Boolean.TRUE.equals(form.getHoursCleared()), current.getId());
+            itemMapper.updateLedgerHours(id, current.getId(), target.getWorkHours(),
+                    target.getWorkHours() == null, current.getName());
         }
         return taskVO(itemMapper.selectAliveById(id),
                 workdays.load(current.getId(), start != null ? start : itemPeriodFrom(item),
@@ -574,6 +615,18 @@ public class CpmWorklogService {
         vo.setStart(item.getPlanStart() == null ? null : item.getPlanStart().toString());
         vo.setEnd(item.getPlanEnd() == null ? null : item.getPlanEnd().toString());
         vo.setProgress(item.getProgress() == null ? 0 : item.getProgress());
+        /* 进度快照只在这里算一次：列/色条/弹层读服务端结果，汇报侧也复用同一工具，
+           不再让前端与后端各写一套 progressAt。期初给回顾上下文，期末给列上显示值。 */
+        List<CpmWorklogDto.HistoryVO> history = trails == null || item.getId() == null
+                ? List.of() : trails.getOrDefault(item.getId(), List.of());
+        List<CpmProgressSnapshots.Point> points = CpmProgressSnapshots.ofHistory(history);
+        int currentProgress = vo.getProgress();
+        vo.setPeriodStartProgress(from == null ? currentProgress : CpmProgressSnapshots.at(points, item, from));
+        CpmProgressSnapshots.Snapshot snapshot = CpmProgressSnapshots.snapshot(
+                points, item, from, to, currentPeriodAnchor());
+        vo.setPeriodProgress(snapshot.value());
+        vo.setPeriodProgressKind(snapshot.kind());
+        vo.setLatestProgressAt(snapshot.latestAt() == null ? null : snapshot.latestAt().toString());
         vo.setNote(item.getNoteHtml() == null ? "" : item.getNoteHtml());
         vo.setPlanType(item.getPlanType() == null ? CpmConstants.PLAN_TYPE_PLANNED : item.getPlanType());
         vo.setInsertedAt(item.getInsertedAt() == null ? null : item.getInsertedAt().toString());
@@ -583,12 +636,25 @@ public class CpmWorklogService {
         if (from != null && to != null && calendar != null) {
             vo.setPeriodHours(calendar.hoursInPeriod(item.getPlanStart(), item.getPlanEnd(), from, to));
         }
-        vo.setState(stateOf(item.getProgress(), item.getPlanStart()));
+        // 手工覆盖必须同时回传原算值与覆盖值：只给一个数字，界面就无法解释「為什麼不是 8 的倍数」，
+        // 也无法给出「恢复自動」这条退路
+        BigDecimal manual = manualHoursOf(item);
+        vo.setHoursOverride(manual);
+        if (manual != null) {
+            vo.setHours(manual.setScale(0, RoundingMode.HALF_UP).intValue());
+            vo.setPeriodHours(overlapsWindow(item.getPlanStart(), item.getPlanEnd(), from, to) ? vo.getHours() : 0);
+        }
+        /* 加班拆分：由合计减工作日 × 8h 派生，不入库也不在这里另定口径。
+           台账列、统计卡与汇报必须拿到同一个数，否则会出现「列上 +4h、卡片 +0h」。*/
+        vo.setOvertimeHours(CpmWorkdays.overtimeHoursOf(vo.getHours(), vo.getWorkdays()));
+        // 来源已取消优先于进度：一场被取消的会不该因为进度停在 60% 就被念成「还在进行中」
+        vo.setCancelled(CpmConstants.STATUS_CANCELLED.equals(item.getStatus()));
+        vo.setState(stateOf(item.getStatus(), item.getProgress(), item.getPlanStart()));
         vo.setSourceType(item.getSourceType());
         vo.setSourceRef(item.getSourceRef());
         vo.setRdmSyncEnabled(item.getRdmSyncEnabled());
         if (trails != null && item.getId() != null) {
-            vo.setHistory(trails.getOrDefault(item.getId(), new ArrayList<>()));
+            vo.setHistory(history);
         }
         return vo;
     }
@@ -608,6 +674,12 @@ public class CpmWorklogService {
                     continue;
                 }
                 total++;
+                // 已取消单独成数后直接跳出：把它算进 pending 会让一个人永远完不成自己的指标，
+                // 算进 hours 会让周报工时比实际投入一大截（两场被取消的会共 4 小时）
+                if (task.isCancelled()) {
+                    t.setCancelled(t.getCancelled() + 1);
+                    continue;
+                }
                 int progress = task.getProgress();
                 sumProgress += progress;
                 if (progress >= 100) {
@@ -667,6 +739,136 @@ public class CpmWorklogService {
         item.setNoteText(CpmNoteHtml.toPlainText(note));
     }
 
+    /**
+     * 来源写入：{@code source_type} 与 {@code source_ref} 必须成对，且取值受白名单约束。
+     *
+     * <p>白名单就是 {@code ck_cpm_item_source} 的 DDL 同源集合：把未登记的来源字符串直接
+     * 落库，轻则被 CHECK 打回、重则造出一个没有任何导出口认识的关联。前端递什么都不算：
+     * 导入入口只能由服务端产生候选，所以这里只验收合法性，不拿它当归属凭证。
+     * <p>只传一半当作手工录入而不是报错：台账的行内保存是个整体补丁，手改标题时不应该
+     * 因为前端少带了一个字段就整条保存失败。
+     */
+    private void applySource(CpmItem item, String sourceType, String sourceRef) {
+        if (!StringUtils.hasText(sourceType) || !StringUtils.hasText(sourceRef)) {
+            item.setSourceType(CpmConstants.SOURCE_MANUAL);
+            item.setSourceRef(null);
+            return;
+        }
+        if (!CpmConstants.SOURCE_TYPES.contains(sourceType)) {
+            throw new BusinessException("不支持的來源類型");
+        }
+        if (sourceRef.length() > 64) {
+            throw new BusinessException("來源標識過長");
+        }
+        item.setSourceType(sourceType);
+        item.setSourceRef(sourceRef.trim());
+    }
+
+    /**
+     * 手工耗时的写入：先按工作日口径验上限，再落库。
+     *
+     * <p>值本身不是重点，{@code work_hours_source} 才是：不写来源就再也分不清哪个数字
+     * 是用户量过的、哪个是工作日推出来的，而这两个数在汇报里必须能区分。
+     * <p>上限不能只靠前端禁用保存：前端校验不是安全边界，绕过界面直接 POST 一个
+     * 10000 就能把周报总工时撑成一个不可能的数字。这里也不静默夹紧：静默改用户
+     * 输入会让人以为保存成功，而实际存的不是他填的数（旧实现是夹紧到 999）。
+     * <p>未排期（两个日期缺一个）按一个工作日计上限而不是拒写：补录一件已经做完的
+     * 事是台账最常见的用法，先有工时后排期是合理顺序。0 视为清除覆盖：真意为 0 的
+     * 工时不是一个计划量，而是一个「还没估」。
+     */
+    private void applyHours(CpmItem item, BigDecimal hours, boolean cleared, long userId) {
+        if (cleared || hours == null || hours.compareTo(BigDecimal.ZERO) <= 0) {
+            item.setWorkHours(null);
+            item.setWorkHoursSource(CpmConstants.WORKLOG_HOURS_SOURCE_NONE);
+            return;
+        }
+        LocalDate start = item.getPlanStart();
+        LocalDate end = item.getPlanEnd();
+        int wd = (start == null || end == null || end.isBefore(start))
+                ? 0
+                : workdays.load(userId, start, end).workdays(start, end);
+        int cap = CpmWorkdays.hoursCap(wd);
+        if (hours.compareTo(BigDecimal.valueOf(cap)) > 0) {
+            throw new BusinessException(String.format(
+                    "耗時超出上限：%dh（%d 個工作日 × %dh）；請先拉長排期", cap, Math.max(wd, 1),
+                    CpmConstants.WORKLOG_HOURS_CAP_PER_DAY));
+        }
+        item.setWorkHours(hours.setScale(1, RoundingMode.HALF_UP));
+        item.setWorkHoursSource(CpmConstants.WORKLOG_HOURS_SOURCE_MANUAL);
+    }
+
+    /**
+     * 手工耗时的读取口径：只有标记为 manual 且大于 0 的值才算覆盖。
+     *
+     * <p>不拿 {@code work_hours} 列本身的非空作凭：时段回算（{@code CpmTimeEntryService}）
+     * 会把精确到分钟的合计写进同一列并标 source=segment。台账这一列回答的是
+     * 「这段排期我估了多少小时」，把打卡合计当作计划值，就会在同一张表上长出两种语义
+     *（口径：手工值 > 工作日×8h，时段与台账工时解耦）。
+     *
+     * <p>包可见供汇报聚合复用同一个判据：台账列与汇报工时必须同一处判定，否则就是
+     * 「页面 12h、推送 8h」这种两边各自算对但互相打脸的数字。
+     */
+    static BigDecimal manualHoursOf(CpmItem item) {
+        if (item.getWorkHours() == null || item.getWorkHours().compareTo(BigDecimal.ZERO) <= 0) {
+            return null;
+        }
+        return CpmConstants.WORKLOG_HOURS_SOURCE_MANUAL.equals(item.getWorkHoursSource())
+                ? item.getWorkHours() : null;
+    }
+
+    /**
+     * 导入后会议被取消的对账：把已取消/已释放会议对应的条目落成 cancelled。
+     *
+     * <p>为什么放在读取而不是会议取消事务里推送：取消有四条入口（单场取消、系列取消的三种
+     * scope、未到场自动释放），还可能有运维直接改库。逐条 hook 必漏一条，而且
+     * 对本次上线之前已经取消的会永远补不回来。读取时对账只需一处，且天然幂等。
+     *
+     * <p>为什么对账失败不能阻断台账：会议域只是另一个域的一个只读端口，它报错时
+     * 用户自己的台账仍然可读。宁可在日志里留痕，不要把别人的故障做成自己页面的红横幅。
+     * 宁可这一页暂时还显示旧状态，也不要让人打不开自己的记录。
+     */
+    private void reconcileCancelledMeetings(SysUser current) {
+        List<CpmItem> imported = itemMapper.listBySource(current.getId(), CpmConstants.SOURCE_MEETING);
+        if (imported.isEmpty()) {
+            return;
+        }
+        Set<String> cancelledRefs = new HashSet<>();
+        try {
+            List<Long> bookingIds = imported.stream()
+                    .map(CpmItem::getSourceRef)
+                    .filter(StringUtils::hasText)
+                    .map(ref -> {
+                        try {
+                            return Long.valueOf(ref.trim());
+                        } catch (NumberFormatException e) {
+                            // 脏 source_ref（手工改库或旧数据）不参与对账：宁可它停在旧状态，
+                            // 也不要因为一行脏数据把整次读取拉坑
+                            return null;
+                        }
+                    })
+                    .filter(Objects::nonNull)
+                    .limit(CpmConstants.MEETING_RECONCILE_MAX)
+                    .toList();
+            Map<Long, String> statuses = meetingActions.findBookingStatuses(bookingIds);
+            statuses.forEach((id, status) -> {
+                if (MeetingConstants.isNonDeliverable(status)) {
+                    cancelledRefs.add(String.valueOf(id));
+                }
+            });
+        } catch (Exception e) {
+            log.warn("台账会议取消对账跳过（会议域不可用）: user={} err={}", current.getId(), e.getMessage());
+            return;
+        }
+        if (cancelledRefs.isEmpty()) {
+            return;
+        }
+        int changed = itemMapper.markCancelledBySourceRefs(current.getId(), CpmConstants.SOURCE_MEETING,
+                cancelledRefs, current.getName());
+        if (changed > 0) {
+            log.info("台账会议对账: user={} 已将 {} 条导入条目改为已取消", current.getId(), changed);
+        }
+    }
+
     private static String statusOf(int progress, LocalDate start) {
         if (progress >= 100) {
             return CpmConstants.STATUS_DONE;
@@ -678,6 +880,19 @@ public class CpmWorklogService {
     }
 
     private static String stateOf(Integer progress, LocalDate start) {
+        return stateOf(null, progress, start);
+    }
+
+    /**
+     * 状态口径：已取消是唯一不由进度决定的档位。
+     *
+     * <p>storedStatus 只用来识别 cancelled；其余一律仍由进度与排期推导，不让存量的
+     * status 列与进度互相顶牛（那会重演「進行中 + 100%」这种自相矛盾的组合）。
+     */
+    private static String stateOf(String storedStatus, Integer progress, LocalDate start) {
+        if (CpmConstants.STATUS_CANCELLED.equals(storedStatus)) {
+            return CpmConstants.STATUS_CANCELLED;
+        }
         int value = progress == null ? 0 : progress;
         if (value >= 100) {
             return CpmConstants.STATUS_DONE;
@@ -686,6 +901,17 @@ public class CpmWorklogService {
             return "plan";
         }
         return value > 0 ? CpmConstants.STATUS_DOING : CpmConstants.STATUS_TODO;
+    }
+
+    /** 手工工时是否落在本次查询区间：有覆盖值时只判相交，不拆日（拆日就是编数字） */
+    private static boolean overlapsWindow(LocalDate start, LocalDate end, LocalDate from, LocalDate to) {
+        if (from == null || to == null) {
+            return true;
+        }
+        if (start == null || end == null) {
+            return false;
+        }
+        return !end.isBefore(from) && !start.isAfter(to);
     }
 
     private LocalDate itemPeriodFrom(CpmItem item) {

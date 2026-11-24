@@ -7,6 +7,9 @@
  */
 import dayjs, { type Dayjs } from 'dayjs'
 import i18n from '@/i18n'
+// 只取类型不取运行时：这个模块是台账的纯数据模型（可单测、无请求），
+// 但 RDM 回写形状已经进了行模型，复制一份定义就会与条目侧分叉
+import type { CpmRdmSyncVO } from '@/api/cpm'
 import { noteToText } from './noteRich'
 
 /**
@@ -18,7 +21,36 @@ import { noteToText } from './noteRich'
  */
 
 export const HOURS_PER_DAY = 8
+/**
+ * 单个自然日的绝对工时上限（小时）。
+ *
+ * <p>正常口径是 8h，但加班是真实存在的投入：把上限钉在 8h 会让人无法记录
+ * 「一个工作日干了 12 小时」，只能去拉长排期凑数字——那等于逼用户伪造排期。
+ * 24h 是「一天最多装得下多少」的物理上限，不是鼓励值；超过它一律拒绝。
+ */
+export const HOURS_CAP_PER_DAY = 24
+/**
+ * 单条子任務工时的存储天花板：对齐服务端列宽 DECIMAL(4,1)（与 CpmConstants.WORKLOG_HOURS_MAX 同源）。
+ *
+ * <p>一个跳半年的任务按 × 24h 会算出六千多小时，那个数根本存不下去；前端不封这一层
+ * 就会做出一个「能填进去、保存才报错」的输入框。
+ */
+export const HOURS_STORAGE_MAX = 999
 export const STORAGE_KEY = 'cpm-worklog-gantt-v1'
+
+/** 服务端进度快照种类；前端只展示，不自行实现回退规则。 */
+export type PeriodProgressKind = 'live' | 'period' | 'stale' | 'notStarted' | 'legacy' | 'future'
+export interface PeriodProgress { value: number; kind: PeriodProgressKind }
+
+/**
+ * 读取服务端算好的周期快照；旧后端未回传时只回落当前值，不在前端重算流水。
+ *
+ * <p>回落不伪造历史：滚动发布期间若 Pages 先于后端上线，历史档暂时显示当前值，
+ * 也不会在前端实现第二套 R1–R5 与后端分叉。
+ */
+export function periodProgressOfTask(t: GanttTask): PeriodProgress {
+  return { value: t.periodProgress ?? t.progress, kind: t.periodProgressKind ?? 'live' }
+}
 
 export interface GanttTask {
   id: string
@@ -26,8 +58,14 @@ export interface GanttTask {
   /** YYYY-MM-DD；null = 未排期 */
   start: string | null
   end: string | null
-  /** 0-100 */
+  /** 0-100：始终是此刻真实最新进度，编辑提交改的是它 */
   progress: number
+  /** 服务端算的查询周期期初/期末快照；旧后端缺省时由适配层回落当前值 */
+  periodStartProgress?: number
+  periodProgress?: number
+  periodProgressKind?: PeriodProgressKind
+  /** 全部流水的最新日期；用于判断往期快照卡是否冗余 */
+  latestProgressAt?: string | null
   note: string
   /** 進度流水（匯報「進度變更」聚合的唯一來源）；舊存量數據可缺省 */
   history?: { at: string; progress: number }[]
@@ -35,6 +73,24 @@ export interface GanttTask {
   planType?: 'planned' | 'inserted'
   /** 標記為臨時插入的日期（YYYY-MM-DD）；原計劃為 null */
   insertedAt?: string | null
+  /**
+   * 手工耗時覆蓋（小時）。缺省/ null 時耗時回落到「區間工作日 × 8h」的計算值；
+   * 一旦用戶在耗時列改過就以它為準——計算值是預算口徑，人是唯一能說清實際投入的。
+   */
+  hoursOverride?: number | null
+  /** 來源系統類型（meeting/rdm_task/…）；手工錄入為 null */
+  sourceType?: string | null
+  /** 來源對象 ID（與 sourceType 成對，重复导入由服务端唯一键裁决） */
+  sourceRef?: string | null
+  /**
+   * 來源已取消（目前只有會議會置 true）。
+   *
+   * <p>它不是「進度 0%」也不該被刪掉：會被人取消不代表自己沒做過安排，
+   * 事实必须留着，只是不再占用日常注意力。服务端由台账读取时对账得出。
+   */
+  cancelled?: boolean
+  /** RDM 回寫狀態（只有关联 RDM 任務的行有值）：台账不另立口径，沿用条目侧结构 */
+  rdmSync?: CpmRdmSyncVO | null
 }
 
 export interface GanttGroup {
@@ -103,10 +159,17 @@ export function setDayType(data: GanttData, key: string, type: SpecialDayType | 
   return next
 }
 
-export type TaskStatus = 'done' | 'doing' | 'todo' | 'plan'
+export type TaskStatus = 'done' | 'doing' | 'todo' | 'plan' | 'cancelled'
 
-/** 状态由进度唯一推导，避免「進行中 + 100%」式自相矛盾（与 meta.ts 同一决策） */
+/**
+ * 状态推导：来源已取消优先于进度。
+ *
+ * <p>不让进度参与：一场会取消了但人确实为它排过时间，进度仍停在 60% 时，
+ * 把它显示成「進行中」就是在催一件已经不存在的事；反过来也不能因为来源取消就把进度清零，
+ * 那是删事实。「已取消」单独成档，筛得出、看得见。
+ */
 export function taskStatus(t: GanttTask): TaskStatus {
+  if (t.cancelled) return 'cancelled'
   if (t.progress >= 100) return 'done'
   if (!t.start || !t.end) return 'plan'
   if (t.progress > 0) return 'doing'
@@ -122,6 +185,8 @@ export const TASK_STATUS_META: Record<TaskStatus, { label: string; tag: string }
   doing: { tag: 'blue', get label() { return i18n.t('cpm.status.doing', { defaultValue: '進行中' }) } },
   todo: { tag: 'red', get label() { return i18n.t('cpm.gantt.status.todo', { defaultValue: '待處理' }) } },
   plan: { tag: 'default', get label() { return i18n.t('cpm.gantt.status.plan', { defaultValue: '待排期' }) } },
+  // 灰色而不标红：红代「异常/失败」，会议被取消不是本人的过错，也不该进异常统计
+  cancelled: { tag: 'default', get label() { return i18n.t('cpm.status.cancelled', { defaultValue: '已取消' }) } },
 }
 
 /**
@@ -182,8 +247,27 @@ export function workdayCount(start: string | null, end: string | null, data: Pic
   return n
 }
 
-export function taskHours(t: GanttTask, data: Pick<GanttData, 'holidays' | 'makeup' | 'compOff' | 'leave'>): number {
-  return workdayCount(t.start, t.end, data) * HOURS_PER_DAY
+/**
+ * 手工耗时的绝对上限：交集工作日数 × 24h，未排期时退回一个工作日。
+ *
+ * <p>用工作日数而不是自然日数：周末与节假日根本不在岗，把它们算进上限就等于
+ * 承认「七天连轴」是正常安排，而这一列的口径本来就是工作日。
+ */
+export function hoursCap(workdays: number): number {
+  return Math.min(Math.max(workdays, 1) * HOURS_CAP_PER_DAY, HOURS_STORAGE_MAX)
+}
+
+/**
+ * 把合计拆成正常工时与加班工时——加班不另存一列，只由「合计 − 工作日 × 8h」派生。
+ *
+ * <p>派生而不是入库：加班量完全由已有的两个数（合计、工作日数）决定，存成第三列
+ * 就会在用户改排期时留下一个没人维护的旧数字，而它会直接进周报。
+ * <p>正常工时不会超过合计：填 3 小时就是 3 小时正常、0 加班，不会因为「本来有 16h
+ * 额度」而虚报成 16h。
+ */
+export function splitHours(total: number, workdays: number): { normal: number; overtime: number } {
+  const normal = Math.min(Math.max(total, 0), workdays * HOURS_PER_DAY)
+  return { normal, overtime: Math.max(0, Math.max(total, 0) - normal) }
 }
 
 /** 任務排期與查詢區間是否相交（時間維度篩選口徑） */
@@ -191,9 +275,34 @@ export function overlaps(t: GanttTask, startStr: string, endStr: string): boolea
   return !!t.start && !!t.end && t.start <= endStr && t.end >= startStr
 }
 
-/** 區間內投入工時 = 交集工作日 × 8h（匯報工時分布同一口徑） */
+/**
+ * 整段耗時：手工覆蓋值優先，其次「工作日 × 8h」的計算值。
+ *
+ * <p>手工值不参与工作日换算：用户填 3 小时就是 3 小时，跨了几个周末与它无关——
+ * 計算值是「没量过」时的默认口径，不是对实际投入的约束。
+ */
+export function taskHours(t: GanttTask, data: Pick<GanttData, 'holidays' | 'makeup' | 'compOff' | 'leave'>): number {
+  if (t.hoursOverride != null && t.hoursOverride > 0) return t.hoursOverride
+  return workdayCount(t.start, t.end, data) * HOURS_PER_DAY
+}
+
+/** 该行的加班工时（合计超出工作日 × 8h 的部分）；无手工覆盖时恒为 0 */
+export function taskOvertimeHours(t: GanttTask, data: Pick<GanttData, 'holidays' | 'makeup' | 'compOff' | 'leave'>): number {
+  if (t.hoursOverride == null || t.hoursOverride <= 0) return 0
+  return splitHours(t.hoursOverride, workdayCount(t.start, t.end, data)).overtime
+}
+
+/**
+ * 區間內投入工時：手工值就是手工值（不按区间折算），无覆盖时才取交集工作日 × 8h。
+ *
+ * <p>加班拆分同样走这一条：合计里超出「交集工作日 × 8h」的部分就是本期加班，
+ * 不在这里另算一套，否则台账列、统计卡与周报会各自给出对不上的正常/加班数字。
+ */
 export function hoursInPeriod(t: GanttTask, startStr: string, endStr: string, data: Pick<GanttData, 'holidays' | 'makeup' | 'compOff' | 'leave'>): number {
   if (!t.start || !t.end) return 0
+  // 手工填的总工时不拆到周期：把 12h 按工作日比例劈成「本周 4.3h」是编出来的数字，
+  // 用户看到只会怀疑自己填错了；所以有覆盖值时只在与本周期相交时整笔计入
+  if (t.hoursOverride != null && t.hoursOverride > 0) return overlaps(t, startStr, endStr) ? t.hoursOverride : 0
   const s = t.start > startStr ? t.start : startStr
   const e = t.end < endStr ? t.end : endStr
   if (e < s) return 0

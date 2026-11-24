@@ -33,6 +33,34 @@ public class CpmWorkdays {
     private final CpmWorkCalendarMapper calendarMapper;
 
     /**
+     * 手工耗时的绝对上限：工作日数 × 24h，未排期（0 个工作日）退回一个工作日，
+     * 并与列宽 {@code DECIMAL(4,1)} 能存的 {@code WORKLOG_HOURS_MAX} 取小。
+     *
+     * <p>不返回 0：未排期不等于「不能记工时」，补录一件已经做完的事恰恰是最常见的用法，
+     * 把上限锁在 0 会直接禁止这一类录入。
+     * <p>取 999 这一刀不是保守：一个跨半年的任务按 × 24h 会算出六千多小时，直接超出列宽
+     * 会在写库时报截断错误——报错位置比拒写更深，而且那个数字本身已经没有意义。
+     */
+    public static int hoursCap(int workdays) {
+        return Math.min(Math.max(workdays, 1) * CpmConstants.WORKLOG_HOURS_CAP_PER_DAY, CpmConstants.WORKLOG_HOURS_MAX);
+    }
+
+    /**
+     * 正常工时：合计封顶到「工作日数 × 8h」。
+     *
+     * <p>加班不另存一列，只由「合计 − 正常」派生：它完全取决于已有的两个数，
+     * 存成第三列就会在用户改排期时留下一个没人维护的旧数字，而它会直接进周报。
+     */
+    public static int normalHoursOf(int total, int workdays) {
+        return Math.min(Math.max(total, 0), workdays * CpmConstants.WORKLOG_HOURS_PER_DAY);
+    }
+
+    /** 加班工时：合计超出「工作日数 × 8h」的部分；不倒挂、不拿负数 */
+    public static int overtimeHoursOf(int total, int workdays) {
+        return Math.max(0, Math.max(total, 0) - normalHoursOf(total, workdays));
+    }
+
+    /**
      * 一次读取的日历快照：一天只对应一个生效类型。
      *
      * <p>用 Map 而不是四个 Set：同一日期既可能在全局法定名单里（节假日），又可能

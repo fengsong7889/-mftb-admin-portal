@@ -8,7 +8,7 @@
 import dayjs, { type Dayjs } from 'dayjs'
 import i18n from '@/i18n'
 import {
-  HOURS_PER_DAY, fmt, hoursInPeriod, isRestDay, overlaps, taskHours,
+  HOURS_PER_DAY, fmt, hoursInPeriod, isRestDay, overlaps, splitHours, taskHours, workdayCount,
   type GanttData, type GanttGroup, type GanttTask,
 } from './worklogGanttModel'
 import { noteToText } from './noteRich'
@@ -28,6 +28,13 @@ export interface ReportRow {
   pEnd: number
   delta: number
   hours: number
+  /**
+   * 本期加班工时（合计超出交集工作日 × 8h 的部分）。
+   *
+   * <p>与台账耗时列同一派生：汇报里只报一个合计，读的人无法判断这是「两天正常」
+   * 还是「两天加了一晚上班」，而这两种情况在周会里是完全不同的话。
+   */
+  overtime: number
   /** 期内完成时点（YYYY-MM-DD），非期内完成为 null */
   doneAt: string | null
   overdueDays: number
@@ -37,6 +44,7 @@ export interface ReportGroupRow {
   group: GanttGroup
   rows: ReportRow[]
   hours: number
+  overtime: number
   avgStart: number
   avgEnd: number
   doneCount: number
@@ -53,6 +61,8 @@ export interface WorkReport {
     avgStart: number
     avgEnd: number
     hours: number
+    /** 本期加班合计（已含在 hours 里） */
+    overtimeHours: number
     risks: number
     backlog: number
     total: number
@@ -88,6 +98,19 @@ export function doneAtOf(t: GanttTask): string | null {
   return t.end
 }
 
+/**
+ * 交集工作日数：与 hoursInPeriod 走同一条区间口径。
+ *
+ * <p>加班量是「合计 − 交集工作日 × 8h」，两边用不同区间算就会得出
+ * 「工时按本期截、工作日按整段算」的假加班（一场跳月的会被多算好几晚）。
+ */
+function periodWorkdays(t: GanttTask, s: string, e: string, data: GanttData): number {
+  if (!t.start || !t.end) return 0
+  const from = t.start > s ? t.start : s
+  const to = t.end < e ? t.end : e
+  return to < from ? 0 : workdayCount(from, to, data)
+}
+
 export function buildWorkReport(data: GanttData, start: Dayjs, end: Dayjs): WorkReport {
   const s = fmt(start)
   const e = fmt(end)
@@ -98,7 +121,7 @@ export function buildWorkReport(data: GanttData, start: Dayjs, end: Dayjs): Work
   data.groups.forEach(g => g.tasks.forEach(t => {
     const scheduled = !!t.start && !!t.end
     if (!scheduled) {
-      backlog.push({ task: t, group: g, pStart: t.progress, pEnd: t.progress, delta: 0, hours: 0, doneAt: null, overdueDays: 0 })
+      backlog.push({ task: t, group: g, pStart: t.progress, pEnd: t.progress, delta: 0, hours: 0, overtime: 0, doneAt: null, overdueDays: 0 })
       return
     }
     if (!overlaps(t, s, e)) return
@@ -106,9 +129,11 @@ export function buildWorkReport(data: GanttData, start: Dayjs, end: Dayjs): Work
     const pEnd = progressAt(t, e)
     const doneAt = doneAtOf(t)
     const overdueDays = t.end! < today && t.progress < 100 ? dayjs(today).diff(dayjs(t.end!), 'day') : 0
+    const hours = hoursInPeriod(t, s, e, data)
     rows.push({
       task: t, group: g, pStart, pEnd, delta: pEnd - pStart,
-      hours: hoursInPeriod(t, s, e, data),
+      hours,
+      overtime: splitHours(hours, periodWorkdays(t, s, e, data)).overtime,
       doneAt: doneAt && doneAt >= s && doneAt <= e ? doneAt : null,
       overdueDays,
     })
@@ -119,9 +144,10 @@ export function buildWorkReport(data: GanttData, start: Dayjs, end: Dayjs): Work
       const gr = rows.filter(r => r.group.id === g.id)
       if (gr.length === 0) return null
       const hours = gr.reduce((sum, r) => sum + r.hours, 0)
+      const overtime = gr.reduce((sum, r) => sum + r.overtime, 0)
       const avgStart = Math.round(gr.reduce((sum, r) => sum + r.pStart, 0) / gr.length)
       const avgEnd = Math.round(gr.reduce((sum, r) => sum + r.pEnd, 0) / gr.length)
-      return { group: g, rows: gr, hours, avgStart, avgEnd, doneCount: gr.filter(r => r.doneAt).length }
+      return { group: g, rows: gr, hours, overtime, avgStart, avgEnd, doneCount: gr.filter(r => r.doneAt).length }
     })
     .filter((x): x is ReportGroupRow => x !== null)
     .sort((a, b) => b.hours - a.hours)
@@ -131,6 +157,7 @@ export function buildWorkReport(data: GanttData, start: Dayjs, end: Dayjs): Work
   const avgStart = rows.length ? Math.round(rows.reduce((sum, r) => sum + r.pStart, 0) / rows.length) : 0
   const avgEnd = rows.length ? Math.round(rows.reduce((sum, r) => sum + r.pEnd, 0) / rows.length) : 0
   const hours = rows.reduce((sum, r) => sum + r.hours, 0)
+  const overtimeHours = rows.reduce((sum, r) => sum + r.overtime, 0)
   const risks = rows.filter(r => r.overdueDays > 0)
   const notes = rows.filter(r => noteToText(r.task.note).trim() !== '')
   const insertedRows = rows.filter(r => {
@@ -151,7 +178,8 @@ export function buildWorkReport(data: GanttData, start: Dayjs, end: Dayjs): Work
     if (!t.start || !t.end || t.start <= e) return
     if (dayjs(t.start).diff(end, 'day') > periodLen) return
     const at = progressAt(t, e)
-    plan.push({ task: t, group: g, pStart: at, pEnd: at, delta: 0, hours: taskHours(t, data), doneAt: null, overdueDays: 0 })
+    const full = taskHours(t, data)
+    plan.push({ task: t, group: g, pStart: at, pEnd: at, delta: 0, hours: full, overtime: splitHours(full, workdayCount(t.start, t.end, data)).overtime, doneAt: null, overdueDays: 0 })
   }))
   plan.sort((a, b) => (a.task.start! < b.task.start! ? -1 : 1))
 
@@ -172,7 +200,7 @@ export function buildWorkReport(data: GanttData, start: Dayjs, end: Dayjs): Work
 
   return {
     start: s, end: e, rows, groups,
-    totals: { done, inProgress, avgStart, avgEnd, hours, risks: risks.length, backlog: backlog.length, total: rows.length, inserted: insertedRows.length },
+    totals: { done, inProgress, avgStart, avgEnd, hours, overtimeHours, risks: risks.length, backlog: backlog.length, total: rows.length, inserted: insertedRows.length },
     outputs: rows.filter(r => r.doneAt).sort((a, b) => (a.doneAt! < b.doneAt! ? -1 : 1)),
     insertedRows, risks, notes, plan, daily, peak,
   }
@@ -189,6 +217,9 @@ export function autoOverview(r: WorkReport): string {
     }),
     i18n.t('cpm.workReport.ov.hours', { hours: r.totals.hours, defaultValue: '投入 {{hours}}h（工作日口徑）' }),
   ]
+  /* 加班单独成句：它是周会上最容易被追问的一句（“这 20 小时是怎么排的”）；
+     夹在平均进度后面而不写出来，读的人只会以为本期真的有两个整天可用 */
+  if (r.totals.overtimeHours > 0) parts.push(i18n.t('cpm.workReport.ov.overtime', { overtime: r.totals.overtimeHours, normal: r.totals.hours - r.totals.overtimeHours, defaultValue: '含加班 {{overtime}}h（正常 {{normal}}h）' }))
   if (r.totals.inserted > 0) parts.push(i18n.t('cpm.workReport.ov.inserted', { count: r.totals.inserted, defaultValue: '臨時插入 {{count}} 項' }))
   if (r.totals.risks > 0) parts.push(i18n.t('cpm.workReport.ov.risks', { count: r.totals.risks, defaultValue: '{{count}} 項逾期需關注' }))
   if (r.totals.backlog > 0) parts.push(i18n.t('cpm.workReport.ov.backlog', { count: r.totals.backlog, defaultValue: '{{count}} 項待排期' }))
@@ -208,6 +239,13 @@ export function reportToMarkdown(r: WorkReport, periodLabel: string, summary?: s
   lines.push(i18n.t('cpm.workReport.md.overview', { done: r.totals.done, doing: r.totals.inProgress, total: r.totals.total, defaultValue: '- 完成 {{done}} 項／進行中 {{doing}} 項／覆蓋 {{total}} 項' }))
   lines.push(i18n.t('cpm.workReport.md.avgProgress', { from: r.totals.avgStart, to: r.totals.avgEnd, defaultValue: '- 平均進度：{{from}}% → {{to}}%' }))
   lines.push(i18n.t('cpm.workReport.md.invested', { hours: r.totals.hours, perDay: HOURS_PER_DAY, defaultValue: '- 投入工時：{{hours}}h（工作日 × {{perDay}}h，周末/節假日剔除）' }))
+  /* 加班拆行：导出文本必须与页面说同一句话，否则贴进邮件的周报会弄丢加班事实 */
+  if (r.totals.overtimeHours > 0) {
+    lines.push(i18n.t('cpm.workReport.md.overtime', {
+      overtime: r.totals.overtimeHours, normal: r.totals.hours - r.totals.overtimeHours,
+      defaultValue: '- 其中加班 {{overtime}}h（正常 {{normal}}h）',
+    }))
+  }
   lines.push(i18n.t('cpm.workReport.md.riskLine', {
     risks: r.totals.risks, backlog: r.totals.backlog, inserted: r.totals.inserted,
     defaultValue: '- 風險 {{risks}} 項・臨時插入 {{inserted}} 項・待排期 {{backlog}} 項',
@@ -215,7 +253,9 @@ export function reportToMarkdown(r: WorkReport, periodLabel: string, summary?: s
   lines.push(i18n.t('cpm.workReport.md.s2', { defaultValue: '## 二、本期內容' }), '')
   if (r.groups.length === 0) lines.push(i18n.t('cpm.workReport.md.noContent', { defaultValue: '- 本期無已排期的工作項任務' }))
   r.groups.forEach(g => {
-    lines.push(i18n.t('cpm.workReport.md.groupTitle', { title: g.group.title, count: g.rows.length, hours: g.hours, defaultValue: '### {{title}}（{{count}} 項 · {{hours}}h）' }))
+    lines.push(g.overtime > 0
+      ? i18n.t('cpm.workReport.md.groupTitleOt', { title: g.group.title, count: g.rows.length, hours: g.hours, overtime: g.overtime, defaultValue: '### {{title}}（{{count}} 項 · {{hours}}h，含加班 {{overtime}}h）' })
+      : i18n.t('cpm.workReport.md.groupTitle', { title: g.group.title, count: g.rows.length, hours: g.hours, defaultValue: '### {{title}}（{{count}} 項 · {{hours}}h）' }))
     lines.push(i18n.t('cpm.workReport.md.groupDelta', {
       from: g.avgStart, to: g.avgEnd, delta: `${g.avgEnd - g.avgStart >= 0 ? '+' : ''}${g.avgEnd - g.avgStart}`,
       defaultValue: '- 期初 {{from}}% → 期末 {{to}}%（{{delta}}%）',
@@ -223,7 +263,8 @@ export function reportToMarkdown(r: WorkReport, periodLabel: string, summary?: s
     g.rows.forEach(row => lines.push(i18n.t('cpm.workReport.md.contentRow', {
       task: row.task.title, from: row.pStart, to: row.pEnd, hours: row.hours,
       status: rowStatus(row, i18n.t), inserted: row.task.planType === 'inserted' ? i18n.t('cpm.workReport.md.insertedMark', { defaultValue: '［臨時插入］' }) : '',
-      defaultValue: '- {{task}}{{inserted}} — {{from}}% → {{to}}% · {{hours}}h · {{status}}',
+      overtime: row.overtime > 0 ? i18n.t('cpm.workReport.md.overtimeMark', { overtime: row.overtime, defaultValue: '（含加班 {{overtime}}h）' }) : '',
+      defaultValue: '- {{task}}{{inserted}} — {{from}}% → {{to}}% · {{hours}}h{{overtime}} · {{status}}',
     })))
     lines.push('')
   })
