@@ -214,6 +214,8 @@ public class CpmWorklogService {
     @Transactional
     public void restoreGroup(long id) {
         SysUser current = guard.currentUser();
+        // 虚拟分组没有软删行：对 id=0 恢复只会把「不存在」报成「已恢复」的前半截假成功
+        requireNotVirtualGroup(id);
         if (groupMapper.restore(id, current.getId(), current.getName()) == 0) {
             throw new BusinessException("工作項不存在或不属于本人");
         }
@@ -704,11 +706,21 @@ public class CpmWorklogService {
     }
 
     private CpmWorklogGroup requireOwnedGroup(long id, SysUser current) {
+        // 未分组虚拟容器（id=0）服务端没有对应行：单独报错而不是汇进「不存在」，
+        // 否则界面漏拦时用户只能看到一句无法自解释的「工作項不存在或不属于本人」
+        requireNotVirtualGroup(id);
         CpmWorklogGroup group = groupMapper.selectAliveById(id);
         if (group == null || !current.getId().equals(group.getUserId())) {
             throw new BusinessException("工作項不存在或不属于本人");
         }
         return group;
+    }
+
+    /** 虚拟分组只读：改名/删除/恢复都不接受 id=0 */
+    private static void requireNotVirtualGroup(long id) {
+        if (id == UNGROUPED_ID) {
+            throw new BusinessException("未分組記錄為只讀容器，不可改名或刪除；請刪除或歸檔其中的子任務");
+        }
     }
 
     private Long resolveGroupId(Long groupId, SysUser current) {

@@ -5,6 +5,7 @@
  * 未经著作权人书面许可，不得使用、复制、修改、再分发或用于任何商业目的。
  * 完整许可条款见仓库根目录 LICENSE 文件。
  */
+import i18n from '@/i18n'
 import { collaborativeScores, computeSimilarity, matchOf } from '../TrafficAlgorithmConfig/trialCalcMath'
 import { TAG_DECAY_POLICY } from '../TagDecaySettings/store'
 import { CREATABLE_SCENES, sceneFromParams } from './scenes'
@@ -16,7 +17,7 @@ export const SIMILAR_PREVIEW_TYPE = 17
  *  突出「全域覆蓋 ＋ 生成式策略 ＋ 點擊即時生成 ＋ 多場景回插」四項能力承诺。 */
 export const SIMILAR_ALGO_NAME = '全域相似策略'
 export const SIMILAR_ALGO_ICON = '🧲'
-export const SIMILAR_ALGO_DESC = '全局策略生成式推薦\n點擊實時多場景回插'
+export const SIMILAR_ALGO_DESC = '全局策略交互式推薦\n點擊實時多場景回插'
 /** 入口卡 hero 渐变：indigo 靶蓝（hue≈245）——具科技感的冷色，与品牌宝蓝(≈224)/星紫(≈271) 间隔≥21°，看色识广告。
  *  渐变串内色值属品牌装饰面，不进 cssHex/inlineHex 棘轮口径（同 heroCardStyles 先例）。 */
 export const SIMILAR_HERO_GRADIENT = 'radial-gradient(120% 150% at 86% 0%, rgba(129, 140, 248, 0.55) 0%, rgba(129, 140, 248, 0) 55%), linear-gradient(135deg, #1E1B4B 0%, #312E81 100%)'
@@ -32,9 +33,18 @@ export const TIE_BREAK_VALUES: TieBreak[] = ['trafficDirection', 'quality', 'dis
 export type CategoryLevel = 'primary' | 'secondary' | 'tertiary'
 /** 回插動效風格：僅影響消費者端插入瞬間的呈現，不改變召回/排序/計費口徑。 */
 export type InsertStyle = 'fade' | 'slide' | 'none'
+/** 區域召回範圍與時段優先：與投流頁同詞表；v1 協議白名單未含，第二階段隨場景協議遷移。 */
+export type RegionScope = 'delivery' | 'tradeArea'
+export type TimeSlotFill = 'adjacent' | 'any'
+export const REGION_SCOPE_OPTIONS: { value: RegionScope; label: string }[] = [
+  { value: 'delivery', label: '配送範圍內' }, { value: 'tradeArea', label: '用戶所在商圈' },
+]
+export const TIME_SLOT_FILL_OPTIONS: { value: TimeSlotFill; label: string }[] = [
+  { value: 'adjacent', label: '相鄰時段投流商家' }, { value: 'any', label: '全時段投流商家' },
+]
 export const INSERT_STYLE_OPTIONS: { value: InsertStyle; label: string }[] = [
   { value: 'fade', label: '漸變插入' },
-  { value: 'slide', label: '滑入插入' },
+  { value: 'slide', label: '右側切入' },
   { value: 'none', label: '直接插入' },
 ]
 export const SOURCE_OPTIONS: { value: Source; label: string }[] = [
@@ -48,7 +58,10 @@ export const CATEGORY_LEVEL_OPTIONS: { value: CategoryLevel; label: string }[] =
   { value: 'secondary', label: '二級類目' },
   { value: 'tertiary', label: '三級類目' },
 ]
-export const sourceLabel = (source: Source) => SOURCE_OPTIONS.find(option => option.value === source)!.label
+export const sourceLabel = (source: Source): string => {
+  const option = SOURCE_OPTIONS.find(o => o.value === source)
+  return i18n.t(`recommend.similar.form.source.${source}`, { defaultValue: option?.label ?? source })
+}
 export const BRAND_OPTIONS = [{ value: 'flashBee', label: '閃蜂' }, { value: 'mFood', label: 'mFood' }]
 export interface PrototypeValues {
   name: string
@@ -77,10 +90,13 @@ export interface PrototypeValues {
   rankPreset: 'matchFirst' | 'consumeFirst' | 'custom'
   factors: Factor[]
   tieBreak: TieBreak
-  /** 回插動效（僅預覽/消費者端呈現，v1 協議不下發，第二階段隨 scene_config 遷移）。 */
+  /** 回插動效（随协议下发保存；消費者端渲染待执行接入）。 */
   insertStyle: InsertStyle
   insertAnimMs: number
-  insertHighlight: boolean
+  /** 召回範圍字段：商家召回為固定口徑不入表单态；區域/時段已随协议下发（执行接入前仅作配置真源）。 */
+  regionScope: RegionScope
+  timeSlotEnabled: boolean
+  timeSlotFill: TimeSlotFill
 }
 export const PROTOTYPE_DEFAULTS: PrototypeValues = {
   name: '', brand: 'flashBee', business: 'delivery', scene: 1, tagDecayPolicy: TAG_DECAY_POLICY,
@@ -90,7 +106,8 @@ export const PROTOTYPE_DEFAULTS: PrototypeValues = {
   triggerMode: 'instant', dwellSeconds: 10, dailyMode: 'unlimited', dailyLimit: 3,
   merchantFreqHours: 2, merchantFreqTimes: 1,
   rankPreset: 'matchFirst', factors: ['match', 'quality', 'distance'], tieBreak: 'quality',
-  insertStyle: 'fade', insertAnimMs: 360, insertHighlight: true,
+  insertStyle: 'fade', insertAnimMs: 1000,
+  regionScope: 'delivery', timeSlotEnabled: true, timeSlotFill: 'adjacent',
 }
 
 /** 集中的原型表单 schema：仅做 UX 校验，第二阶段后端必须重验。
@@ -112,16 +129,19 @@ export type NumericField = keyof typeof NUMBER_FIELDS
 export const numberPrecision = (name: NumericField) => name === 'merchantFreqHours' ? 1 : 0
 export interface PrototypeIssue { name: keyof PrototypeValues; message: string }
 export function validatePrototype(values: PrototypeValues): PrototypeIssue[] {
+  // 校验消息走真实 i18n 实例（与投流 config.ts 同口径）：key 族 validate.N，繁中原文作 defaultValue 兜底。
+  const msg = (n: number, zh: string, vars?: Record<string, string | number>) => i18n.t(`recommend.similar.form.validate.${n}`, { ...vars, defaultValue: zh })
+  const fieldLabel = (name: NumericField, fallback: string) => i18n.t(`recommend.similar.form.field.${name}`, { defaultValue: fallback })
   const issues: PrototypeIssue[] = []
   const add = (name: keyof PrototypeValues, message: string) => issues.push({ name, message })
-  if (!values.name?.trim() || values.name.length > 100) add('name', '請填寫 1–100 字的算法名稱')
-  if (!BRAND_OPTIONS.some(option => option.value === values.brand)) add('brand', '請選擇有效品牌')
-  if (!['delivery', 'groupBuy'].includes(values.business)) add('business', '業務範圍必須來自有效的算法庫 Tab')
-  if (!CREATABLE_SCENES.some(scene => scene.code === values.scene)) add('scene', '請選擇可建立算法的場景')
-  if (values.tagDecayPolicy !== TAG_DECAY_POLICY) add('tagDecayPolicy', '必須引用全局標籤衰變規則')
-  if (!values.modes?.length || values.modes.some(m => !SOURCE_OPTIONS.some(s => s.value === m))) add('modes', '至少選擇一種推薦來源')
-  if (!values.modes.includes(values.slot1)) add('slot1', '請選擇已啟用的來源')
-  if (values.count === 2 && !values.modes.includes(values.slot2)) add('slot2', '請選擇已啟用的來源')
+  if (!values.name?.trim() || values.name.length > 100) add('name', msg(1, '請填寫 1–100 字的算法名稱'))
+  if (!BRAND_OPTIONS.some(option => option.value === values.brand)) add('brand', msg(2, '請選擇有效品牌'))
+  if (!['delivery', 'groupBuy'].includes(values.business)) add('business', msg(3, '業務範圍必須來自有效的算法庫 Tab'))
+  if (!CREATABLE_SCENES.some(scene => scene.code === values.scene)) add('scene', msg(4, '請選擇可建立算法的場景'))
+  if (values.tagDecayPolicy !== TAG_DECAY_POLICY) add('tagDecayPolicy', msg(5, '必須引用全局標籤衰變規則'))
+  if (!values.modes?.length || values.modes.some(m => !SOURCE_OPTIONS.some(s => s.value === m))) add('modes', msg(6, '至少選擇一種推薦來源'))
+  if (!values.modes.includes(values.slot1)) add('slot1', msg(7, '請選擇已啟用的來源'))
+  if (values.count === 2 && !values.modes.includes(values.slot2)) add('slot2', msg(8, '請選擇已啟用的來源'))
   for (const name of Object.keys(NUMBER_FIELDS) as NumericField[]) {
     if (name === 'dailyLimit' && values.dailyMode !== 'limited') continue
     if (name === 'dwellSeconds' && values.triggerMode !== 'dwell') continue
@@ -131,23 +151,27 @@ export function validatePrototype(values: PrototypeValues): PrototypeIssue[] {
     const value = values[name]
     if (typeof value !== 'number' || !Number.isFinite(value) || value < min || value > max
       || (name === 'merchantFreqHours' ? Number(value.toFixed(1)) !== value : !Number.isInteger(value))) {
-      add(name, `${label}須在 ${min}–${max}${unit ? ` ${unit}` : ''} 之間${name === 'merchantFreqHours' ? '，最多一位小數' : '，且為整數'}`)
+      const zhTail = name === 'merchantFreqHours' ? '，最多一位小數' : '，且為整數'
+      add(name, msg(9, `${label}須在 ${min}–${max}${unit ? ` ${unit}` : ''} 之間${zhTail}`, {
+        label: fieldLabel(name, label), min, max,
+        unit: unit ? i18n.t(`recommend.similar.form.unit.${unit}`, { defaultValue: unit }) : '',
+        tail: name === 'merchantFreqHours' ? msg(91, zhTail) : msg(92, zhTail),
+      }))
     }
   }
-  if (values.modes.includes('sameCategory') && !CATEGORY_LEVEL_OPTIONS.some(o => o.value === values.categoryLevel)) add('categoryLevel', '請選擇類目匹配層級')
-  if (!['cosine', 'weightedJaccard'].includes(values.metric)) add('metric', '請選擇相似度算法')
-  if (values.rankPreset === 'custom' && (!values.factors.length || values.factors.some(f => !FACTOR_VALUES.includes(f)))) add('factors', '至少選擇一個有效排序因子')
-  if (!TIE_BREAK_VALUES.includes(values.tieBreak)) add('tieBreak', '請選擇有效的同分決勝')
+  if (values.modes.includes('sameCategory') && !CATEGORY_LEVEL_OPTIONS.some(o => o.value === values.categoryLevel)) add('categoryLevel', msg(10, '請選擇類目匹配層級'))
+  if (!['cosine', 'weightedJaccard'].includes(values.metric)) add('metric', msg(11, '請選擇相似度算法'))
+  if (values.rankPreset === 'custom' && (!values.factors.length || values.factors.some(f => !FACTOR_VALUES.includes(f)))) add('factors', msg(12, '至少選擇一個有效排序因子'))
+  if (!TIE_BREAK_VALUES.includes(values.tieBreak)) add('tieBreak', msg(13, '請選擇有效的同分決勝'))
   return issues
 }
 export const needsTraffic = (values: PrototypeValues) => values.rankPreset === 'consumeFirst'
   || (values.rankPreset === 'custom' && values.factors.includes('traffic'))
 
 /** 表单值 → 服务端 type17 参数协议；条件字段只在语义需要时写入，避免后端收到非法组合。
- * 协议 v1 兼容：触发/数量/频控仍随参数下发（后端必填校验），取值为引擎级默认——
+ * 触发/数量/频控仍随参数下发（后端必填校验），取值为引擎级默认——
  * 表单不再编辑这些字段，真實覆蓋入口在場景綁定；第二階段協議 v2 將其遷入 scene_config 後從本函數移除。
- * categoryLevel（同類目匹配層級）不在此写入：服务端 v1 白名單（RULE_KEYS）尚未包含該鍵，写入会直接 422；
- * 第二階段隨後端新增 `categoryMatchLevel` 白名單與校驗一併下發。 */
+ * 2026-11-25 协议扩展：类目层级/区域召回/时段优先/插入动效已进入后端白名单（可选键，出现则校值），随算法保存下发；执行服务接入前它们仅作配置真源。 */
 export function serializeSimilarParams(values: PrototypeValues, business: Business): Record<string, unknown> {
   const rules: Record<string, unknown> = {
     metric: values.metric, merchantSimilarityThreshold: values.threshold,
@@ -160,6 +184,13 @@ export function serializeSimilarParams(values: PrototypeValues, business: Busine
   if (values.dailyMode === 'limited') rules.dailyLimit = values.dailyLimit
   if (values.modes.includes('userSimilar')) rules.userSimilarityThreshold = values.userThreshold
   if (values.rankPreset === 'custom') rules.rankFactors = values.factors
+  // 同類目來源勾選時類目層級必存（后端同口径互校）；其余扩展键始终下发，保存即持久化。
+  if (values.modes.includes('sameCategory')) rules.categoryMatchLevel = values.categoryLevel
+  rules.regionScope = values.regionScope
+  rules.timeSlotPriority = values.timeSlotEnabled
+  rules.timeSlotFill = values.timeSlotFill
+  rules.insertStyle = values.insertStyle
+  rules.insertAnimMs = values.insertAnimMs
   return {
     schemaVersion: 1, targetType: 1,
     applicableBusinessTypes: [business === 'groupBuy' ? 2 : 1],
@@ -185,7 +216,14 @@ export function readSimilarParams(raw: unknown, business: Business): PrototypeVa
     threshold: num(rules.merchantSimilarityThreshold, PROTOTYPE_DEFAULTS.threshold),
     userThreshold: num(rules.userSimilarityThreshold, PROTOTYPE_DEFAULTS.userThreshold),
     modes: modes.length ? modes : [...PROTOTYPE_DEFAULTS.modes],
-    // 類目層級尚未進入 v1 協議，讀取時保持預設；第二階段改由 rules.categoryMatchLevel 回填。
+    // 類目層級：v1 存量参数无键时保持預設；协议扩展后由 rules.categoryMatchLevel 回填。
+    categoryLevel: CATEGORY_LEVEL_OPTIONS.some(o => o.value === rules.categoryMatchLevel)
+      ? rules.categoryMatchLevel as PrototypeValues['categoryLevel'] : PROTOTYPE_DEFAULTS.categoryLevel,
+    regionScope: rules.regionScope === 'tradeArea' ? 'tradeArea' : 'delivery',
+    timeSlotEnabled: typeof rules.timeSlotPriority === 'boolean' ? rules.timeSlotPriority : PROTOTYPE_DEFAULTS.timeSlotEnabled,
+    timeSlotFill: rules.timeSlotFill === 'any' ? 'any' : 'adjacent',
+    insertStyle: rules.insertStyle === 'slide' || rules.insertStyle === 'none' ? rules.insertStyle as PrototypeValues['insertStyle'] : 'fade',
+    insertAnimMs: num(rules.insertAnimMs, PROTOTYPE_DEFAULTS.insertAnimMs),
     count: num(rules.resultCount, 1) === 2 ? 2 : 1,
     slot1: (rules.slot1Source as Source) ?? PROTOTYPE_DEFAULTS.slot1,
     slot2: (rules.slot2Source as Source) ?? PROTOTYPE_DEFAULTS.slot2,
@@ -225,17 +263,19 @@ export interface PreviewResult { items: PreviewCandidate[]; reasons: string[] }
 
 /** 仅为匿名交互样例：不请求真实消费者数据、写标签、申请权益或模拟已经计费。 */
 export function simulatePreview(values: PrototypeValues, binding: PreviewBinding, scenario: PreviewScenario = 'normal'): PreviewResult {
-  if (!binding.enabled) return { items: [], reasons: ['未選擇有效的相似推薦算法'] }
+  // 试算理由文案走真实 i18n（key 族 validate.20+，与校验消息同一登记面）。
+  const msg = (n: number, zh: string, vars?: Record<string, string | number>) => i18n.t(`recommend.similar.form.validate.${n}`, { ...vars, defaultValue: zh })
+  if (!binding.enabled) return { items: [], reasons: [msg(20, '未選擇有效的相似推薦算法')] }
   const issues = validatePrototype(values)
   if (issues.length) return { items: [], reasons: [issues[0].message] }
-  if (!binding.trafficOnly && needsTraffic(values)) return { items: [], reasons: ['自然模式不能使用流量包排序，請改用匹配優先或移除流量因子'] }
-  if (binding.trafficOnly && !binding.trafficSources.length) return { items: [], reasons: ['請選擇至少一個允許的投流來源'] }
-  if (scenario === 'frequency') return { items: [], reasons: ['示例：同商家曝光已達窗口上限，不放寬頻控'] }
-  if (scenario === 'empty') return { items: [], reasons: ['示例：沒有業務合格候選，保留原列表'] }
+  if (!binding.trafficOnly && needsTraffic(values)) return { items: [], reasons: [msg(21, '自然模式不能使用流量包排序，請改用匹配優先或移除流量因子')] }
+  if (binding.trafficOnly && !binding.trafficSources.length) return { items: [], reasons: [msg(22, '請選擇至少一個允許的投流來源')] }
+  if (scenario === 'frequency') return { items: [], reasons: [msg(23, '示例：同商家曝光已達窗口上限，不放寬頻控')] }
+  if (scenario === 'empty') return { items: [], reasons: [msg(24, '示例：沒有業務合格候選，保留原列表')] }
   const reasons: string[] = []
   const eligible = merchants.filter(m => {
     if (binding.trafficOnly && (!m.traffic || !binding.trafficSources.includes(m.traffic) || m.remaining <= 0)) {
-      reasons.push(`${m.name}：沒有所選來源的有效投流餘量`)
+      reasons.push(msg(25, '{{name}}：沒有所選來源的有效投流餘量', { name: m.name }))
       return false
     }
     return true
@@ -251,7 +291,7 @@ export function simulatePreview(values: PrototypeValues, binding: PreviewBinding
       if (source === 'merchantSimilar') {
         const rows = matchOf(ANCHOR_TAGS, m.tags, values.merchantMinimum, values.merchantMinimum).rows
         match = computeSimilarity(rows, values.metric).value
-        if (match <= 0 || match * 100 + 1e-10 < values.threshold) { reasons.push(`${m.name}：商家標籤相似度未達門檻`); continue }
+        if (match <= 0 || match * 100 + 1e-10 < values.threshold) { reasons.push(msg(26, '{{name}}：商家標籤相似度未達門檻', { name: m.name })); continue }
         // 匹配标签热度（同投流 tagHeat 口径）：商家在双方命中交集标签上有效分之和；其他来源无供给强度依据记 0。
         rawHeat = rows.reduce((s, r) => s + (r.a > 0 && r.b > 0 ? r.a : 0), 0)
       } else if (source === 'userSimilar') {
@@ -287,7 +327,7 @@ export function simulatePreview(values: PrototypeValues, binding: PreviewBinding
       if (candidate) { items.push(candidate); break }
     }
   }
-  if (!items.length) reasons.push('沒有符合已啟用來源的候選，保留原列表')
-  if (scenario === 'one') reasons.push('示例：僅一家具備展示資格，不複製商家補滿')
+  if (!items.length) reasons.push(msg(27, '沒有符合已啟用來源的候選，保留原列表'))
+  if (scenario === 'one') reasons.push(msg(28, '示例：僅一家具備展示資格，不複製商家補滿'))
   return { items, reasons: [...new Set(reasons)] }
 }

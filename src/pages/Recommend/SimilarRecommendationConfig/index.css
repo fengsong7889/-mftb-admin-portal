@@ -17,6 +17,9 @@
 .similar-binding { min-width: 0; }
 .similar-binding__label { display: flex; gap: 6px; align-items: center; margin-bottom: 8px; color: var(--text-2); font-size: 13px; }
 .similar-binding .ant-select { width: 100%; }
+/* 啟用開關＋算法下拉同行：开关定宽、下拉撑满剩余宽，窄格（四列同排）下不換行不截断。 */
+.similar-binding__row { display: flex; gap: 8px; align-items: center; }
+.similar-binding__row .ant-select { flex: 1; min-width: 0; }
 .similar-binding__options { display: grid; gap: 8px; margin-top: 10px; }
 .similar-binding__options label { color: var(--text-2); font-size: 12px; }
 .similar-binding__error { color: var(--warning); font-size: 12px; margin: 8px 0 0; }
@@ -92,8 +95,6 @@
 .similar-scene-card__summary { margin: 0; font-size: 12px; line-height: 1.7; color: var(--text-3); }
 .similar-scene-refs { margin: 0; padding-left: 18px; font-size: 13px; color: var(--text-2); line-height: 2; }
 .similar-scene-refs em { font-style: normal; margin-left: 8px; font-size: 12px; color: var(--text-3); }
-.similar-binding__engine { margin-top: 10px; }
-.similar-binding__pending { margin: 10px 0 0; font-size: 12px; line-height: 1.7; color: var(--text-3); }
 .scene-contract { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .scene-contract__tag { font-size: 12px; line-height: 1.6; padding: 1px 8px; border-radius: 4px; border: 1px solid var(--border-2); background: var(--surface-2); color: var(--text-2); }
 .scene-contract__tag.is-paid { color: var(--brand); border-color: var(--brand-border); background: var(--brand-soft); }
@@ -111,30 +112,49 @@
 .scene-override-field .ant-input-number-affix-wrapper > .ant-input-number { flex: 1; min-width: 0; }
 .scene-override-note { margin: 8px 0 0; font-size: 12px; line-height: 1.7; color: var(--text-3); }
 
-/* —— ④ 插入樣式：回插動效與高亮（僅呈現層，不影響召回/排序/計費）。duration/delay 由內聯 style 注入。 —— */
+/* —— ④ 插入樣式：回插動效（僅呈現層，不影響召回/排序/計費）。duration/delay 由內聯 style 注入。 —— */
 .similar-insert--fade { animation-name: similar-insert-fade; animation-timing-function: cubic-bezier(.22, .9, .3, 1); animation-fill-mode: both; }
 .similar-insert--slide { animation-name: similar-insert-slide; animation-timing-function: cubic-bezier(.22, .9, .3, 1); animation-fill-mode: both; }
 .similar-insert--none { animation: none; }
-.similar-insert--highlight { border-color: var(--brand-border); box-shadow: 0 0 0 1px var(--brand-border), 0 8px 20px -10px var(--brand); }
 @keyframes similar-insert-fade { from { opacity: 0; transform: scale(.96) translateY(6px); } to { opacity: 1; transform: none; } }
-@keyframes similar-insert-slide { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+/* 右側切入：商家自右側帶模糊漸隱移入，未插完前模糊透明，落位後恢復清晰正常顯示。 */
+@keyframes similar-insert-slide { from { opacity: .15; transform: translateX(48%); filter: blur(4px); } 70% { opacity: .85; filter: blur(1.2px); } to { opacity: 1; transform: none; filter: blur(0); } }
 /* 無障礙：用戶偏好低動效時降級為直接插入，不阻塞核心預覽。 */
 @media (prefers-reduced-motion: reduce) { .similar-insert--fade, .similar-insert--slide { animation: none; } }
 
-/* —— 插入樣式专用试算：左侧呈现层操作＋右侧瀑布流策略同款手机壳（壳／卡片单一真源 WaterfallPreview）。 —— */
-.insert-trial { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 20px; align-items: start; }
-.insert-trial__controls { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
-.insert-trial__grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+/* —— 插入样式专用试算：左侧呈现层操作卡片＋右侧瀑布流策略同款手机壳（壳按 375 设计基准宽，卡片单一真源 DeliveryStoreCard）。 —— */
+.insert-trial { display: grid; grid-template-columns: minmax(360px, 1fr) auto; gap: 28px; align-items: stretch; }
+.insert-trial__controls { display: flex; flex-direction: column; gap: 14px; min-width: 0; padding: 18px 20px; border: 1px solid var(--border-3); border-radius: 12px; background: var(--surface-2); align-self: start; }
+.insert-trial__grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .insert-trial__field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .insert-trial__field > label { font-size: 12px; font-weight: 500; color: var(--text-3); }
 .insert-trial__field .ant-select, .insert-trial__field .ant-input-number, .insert-trial__field .ant-input-number-affix-wrapper { width: 100%; }
-.insert-trial__status { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12px; color: var(--text-3); }
+.insert-trial__field--wide { grid-column: 1 / -1; }
+.insert-trial__status { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12px; color: var(--text-2); padding: 8px 12px; border-radius: 8px; background: var(--surface-sunken); }
 .insert-trial__hint { margin: 0; font-size: 12px; line-height: 1.7; color: var(--text-3); }
 .insert-trial__actions { display: flex; gap: 8px; }
-/* 动效／高亮作用于卡片外包层：透明描边让高亮描边有附着面；壳内配色随消费者端 mock 不翻面。 */
-.insert-trial__rec-wrap { border-radius: 12px; border: 1px solid transparent; }
+.insert-trial__actions .ant-btn { flex: 1; }
+/* 动效作用于卡片外包层；壳内为真实商家卡（DeliveryStoreCard 单一真源），配色随消费者端 mock 不翻面。 */
+.insert-trial__rec-wrap { border-radius: 12px; }
+/* 左上角标覆盖层：不改消费端卡片本体，沿用外层包装扩展点惯例。 */
+.insert-trial-card-wrap { position: relative; }
+.insert-trial-card-flag { position: absolute; top: 6px; left: 6px; z-index: 6; margin: 0; }
+/* 壳内虚线提示：固定浅色系（非纯黑 rgba/hex，不触棘轮），与屏内消费者 mock 同调。 */
+.insert-trial-empty-flag { border: 1px dashed rgba(148, 148, 148, 0.55); border-radius: 12px; background: rgba(255, 255, 255, 0.65); color: rgba(96, 96, 96, 0.95); font-size: 11px; text-align: center; padding: 10px 12px; line-height: 1.6; }
 /* 壳内容区：单列卡片序列＋自绘细滚动条（仅滚动条 chrome 取平台令牌）。 */
 .insert-trial-feed { display: flex; flex-direction: column; gap: 10px; }
+/* 优惠券／神會員行在试算壳内隐藏以节省纵向空间（仅本弹层作用域，不改消费端卡片本体与 AppPreview 页面）。 */
+.insert-trial-feed .apw-row-member { display: none; }
+/* 锚点卡可点：复刻「点击商家→详情→返回」链路的 affordance。 */
+.insert-trial-anchor { cursor: pointer; }
+/* 壳内详情页：固定浅色系（非纯黑 rgba/hex，不触棘轮），与屏内消费者 mock 同调。 */
+.insert-trial-detail { display: flex; flex-direction: column; gap: 10px; padding: 4px 2px; }
+.insert-trial-detail__cover { width: 100%; height: 140px; object-fit: cover; border-radius: 12px; }
+.insert-trial-detail strong { font-size: 15px; color: rgba(38, 38, 38, 0.95); }
+.insert-trial-detail > span, .insert-trial-detail p { font-size: 12px; color: rgba(96, 96, 96, 0.95); }
+.insert-trial-detail p { margin: 0; line-height: 1.7; }
+.insert-trial-detail__tags { display: flex; gap: 6px; flex-wrap: wrap; }
+.insert-trial-detail__tags span { font-size: 11px; color: rgba(96, 96, 96, 0.95); background: rgba(255, 255, 255, 0.8); border: 1px solid rgba(148, 148, 148, 0.4); border-radius: 6px; padding: 2px 8px; }
 .insert-trial-feed::-webkit-scrollbar { width: 4px; }
 .insert-trial-feed::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 2px; }
 .insert-trial-feed::-webkit-scrollbar-track { background: transparent; }

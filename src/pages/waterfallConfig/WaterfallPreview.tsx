@@ -43,11 +43,17 @@ interface Props {
 /** 高仿真手机外壳（侧键／机身／刘海状态栏／导航栏／滚动内容区）。
  *  壳样式单一真源：瀑布流策略预览与相似引擎插入样式试算共用；
  *  机身与屏内背板代表「不可变的实物／被展示的 APP」（同 PhoneFrame 决策），不随平台主题翻面。 */
-export function PhoneShell({ title, hint, time = '9:41', height = 720, contentClassName, children }: {
-  title: string; hint?: string; time?: string; height?: number; contentClassName?: string; children: ReactNode
+export function PhoneShell({ title, hint, time = '9:41', width = 375, height = 720, contentClassName, children }: {
+  title: string; hint?: string; time?: string; width?: number; height?: number; contentClassName?: string; children: ReactNode
 }) {
+  // 壳尺度单一基准：圆角／屏内缩／刘海／状态栏边距随宽度等比缩放，缺省 375 与历史像素完全一致。
+  const radius = Math.round(width * 52 / 375)
+  const screenRadius = Math.round(width * 42 / 375)
+  const bezel = Math.round(width * 10 / 375)
+  const notchW = Math.round(width * 110 / 375)
+  const statusPad = Math.round(width * 28 / 375)
   return (
-    <div style={{ width: 375, flexShrink: 0, position: 'relative' }}>
+    <div style={{ width, flexShrink: 0, position: 'relative' }}>
       {/* 侧边按钮 */}
       <div style={{ position: 'absolute', left: -3, top: 150, width: 3, height: 32, borderRadius: '2px 0 0 2px', background: 'linear-gradient(180deg, #5A7D9A, #3D6180, #5A7D9A)' }} />
       <div style={{ position: 'absolute', left: -3, top: 195, width: 3, height: 32, borderRadius: '2px 0 0 2px', background: 'linear-gradient(180deg, #5A7D9A, #3D6180, #5A7D9A)' }} />
@@ -56,7 +62,7 @@ export function PhoneShell({ title, hint, time = '9:41', height = 720, contentCl
 
       {/* 手机外壳 */}
       <div style={{
-        width: 375, height, borderRadius: 52, position: 'relative',
+        width, height, borderRadius: radius, position: 'relative',
         background: 'linear-gradient(160deg, #3E5C76 0%, #2C4A64 30%, #1B3A52 60%, #263F56 100%)',
         boxShadow: [
           '0 24px 64px rgba(20,40,65,0.40)', '0 8px 24px rgba(0,0,0,0.22)',
@@ -64,19 +70,19 @@ export function PhoneShell({ title, hint, time = '9:41', height = 720, contentCl
           'inset 1px 0 0 rgba(180,210,240,0.08)', 'inset -1px 0 0 rgba(180,210,240,0.08)',
         ].join(', '),
       }}>
-        <div style={{ position: 'absolute', inset: 0, borderRadius: 52, border: '1px solid rgba(180,210,240,0.12)', pointerEvents: 'none', zIndex: 2 }} />
+        <div style={{ position: 'absolute', inset: 0, borderRadius: radius, border: '1px solid rgba(180,210,240,0.12)', pointerEvents: 'none', zIndex: 2 }} />
         <div style={{ position: 'absolute', top: 90, left: -1, width: 2, height: 6, background: '#4E6E8A', borderRadius: 1, zIndex: 3 }} />
         <div style={{ position: 'absolute', top: 90, right: -1, width: 2, height: 6, background: '#4E6E8A', borderRadius: 1, zIndex: 3 }} />
         <div style={{ position: 'absolute', bottom: 130, left: -1, width: 2, height: 6, background: '#4E6E8A', borderRadius: 1, zIndex: 3 }} />
         <div style={{ position: 'absolute', bottom: 130, right: -1, width: 2, height: 6, background: '#4E6E8A', borderRadius: 1, zIndex: 3 }} />
 
         {/* 屏幕 */}
-        <div style={{ position: 'absolute', inset: 10, borderRadius: 42, background: '#000', overflow: 'hidden' }}>
-          <div style={{ position: 'absolute', inset: 0, borderRadius: 42, background: '#F5F5F5', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ position: 'absolute', inset: bezel, borderRadius: screenRadius, background: '#000', overflow: 'hidden' }}>
+          <div style={{ position: 'absolute', inset: 0, borderRadius: screenRadius, background: '#F5F5F5', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
             {/* 状态栏 */}
-            <div style={{ height: 50, padding: '14px 28px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#fff', flexShrink: 0, position: 'relative', zIndex: 5 }}>
+            <div style={{ height: 50, padding: `14px ${statusPad}px 0`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#fff', flexShrink: 0, position: 'relative', zIndex: 5 }}>
               <span style={{ fontSize: 15, fontWeight: 600, color: '#000', letterSpacing: 0.5 }}>{time}</span>
-              <div style={{ position: 'absolute', top: 10, left: '50%', transform: 'translateX(-50%)', width: 110, height: 30, background: '#000', borderRadius: 16, zIndex: 10 }} />
+              <div style={{ position: 'absolute', top: 10, left: '50%', transform: 'translateX(-50%)', width: notchW, height: 30, background: '#000', borderRadius: 16, zIndex: 10 }} />
               <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                 <svg width="17" height="12" viewBox="0 0 17 12" fill="none"><rect x="0" y="9" width="3" height="3" rx="0.5" fill="#000" /><rect x="4.5" y="6" width="3" height="6" rx="0.5" fill="#000" /><rect x="9" y="3" width="3" height="9" rx="0.5" fill="#000" /><rect x="13.5" y="0" width="3" height="12" rx="0.5" fill="#000" /></svg>
                 <svg width="16" height="12" viewBox="0 0 16 12" fill="none"><circle cx="8" cy="10" r="1.5" fill="#000" /><path d="M4.5 8c1-1.2 2.2-1.8 3.5-1.8s2.5.6 3.5 1.8" stroke="#000" strokeWidth="1.3" strokeLinecap="round" /><path d="M1.8 5.5C3.5 3.5 5.6 2.5 8 2.5s4.5 1 6.2 3" stroke="#000" strokeWidth="1.3" strokeLinecap="round" /></svg>

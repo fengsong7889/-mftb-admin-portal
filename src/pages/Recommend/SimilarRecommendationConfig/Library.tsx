@@ -19,7 +19,7 @@ import {
   brandToAppType, deleteAdAlgorithm, fetchAdAlgorithms, fetchAlgorithmWaterfallReferences,
   updateAdAlgorithmStatus, type AdAlgorithm,
 } from '@/api/adPromotion'
-import { PrototypeHeader, PrototypeNotice, SimilarEngineIcon } from './PrototypeParts'
+import { PrototypeHeader, SimilarEngineIcon } from './PrototypeParts'
 import { SIMILAR_ALGO_NAME, SIMILAR_PREVIEW_TYPE } from './prototype'
 import { CREATABLE_SCENES, sceneFromParams } from './scenes'
 
@@ -59,13 +59,13 @@ export default function SimilarAlgorithmLibrary() {
       setRows(filtered)
       setTotal(filtered.length)
     } catch (error) {
-      message.error(error instanceof Error ? error.message : '加載失敗，請重試')
+      message.error(error instanceof Error ? error.message : t('recommend.similar.library.loadFailed', { defaultValue: '加載失敗，請重試' }))
       setRows([])
       setTotal(0)
     } finally {
       setLoading(false)
     }
-  }, [scene])
+  }, [scene, t])
   useEffect(() => { void load(pagination.current, pagination.pageSize, filter) }, [load, pagination.current, pagination.pageSize, filter, tab, scene])
 
   const columnMeta = useMemo(() => [
@@ -89,14 +89,17 @@ export default function SimilarAlgorithmLibrary() {
     const run = async () => {
       try {
         await updateAdAlgorithmStatus(record.id as number, next)
-        message.success(next === 1 ? '已啟用' : '已停用；綁定該算法的場景將停止新決策')
+        message.success(next === 1
+          ? t('recommend.similar.library.enabled', { defaultValue: '已啟用' })
+          : t('recommend.similar.library.disabled', { defaultValue: '已停用；綁定該算法的場景將停止新決策' }))
         void load(pagination.current, pagination.pageSize, filter)
-      } catch (error) { message.error(error instanceof Error ? error.message : '操作失敗') }
+      } catch (error) { message.error(error instanceof Error ? error.message : t('recommend.similar.library.opFailed', { defaultValue: '操作失敗' })) }
     }
     if (next === 2) {
       Modal.confirm({ className: 'custom-confirm-modal', icon: <div className="confirm-icon-wrapper confirm-icon-wrapper--danger"><span className="confirm-icon-text">!</span></div>,
-        title: '停用算法？', content: '停用後綁定該算法的瀑布流場景不會產生新推薦；基礎坑位與投流訂單不受影響。',
-        okText: '停用', cancelText: '取消', okButtonProps: { danger: true }, onOk: run })
+        title: t('recommend.similar.library.disableTitle', { defaultValue: '停用算法？' }),
+        content: t('recommend.similar.library.disableContent', { defaultValue: '停用後綁定該算法的瀑布流場景不會產生新推薦；基礎坑位與投流訂單不受影響。' }),
+        okText: t('recommend.similar.library.disableOk', { defaultValue: '停用' }), cancelText: t('common.cancel'), okButtonProps: { danger: true }, onOk: run })
       return
     }
     void run()
@@ -106,7 +109,7 @@ export default function SimilarAlgorithmLibrary() {
     try { refs = await fetchAlgorithmWaterfallReferences(record.id as number) } catch { /* 查询失败不阻断确认流程 */ }
     Modal.confirm({ className: 'custom-confirm-modal', icon: <div className="confirm-icon-wrapper confirm-icon-wrapper--danger"><span className="confirm-icon-text">!</span></div>,
       title: t('common.confirmDelete'),
-      content: <div><p>刪除後不可恢復；仍被瀑布流場景綁定引用時後端會拒絕。</p>
+      content: <div><p>{t('recommend.similar.library.deleteContent', { defaultValue: '刪除後不可恢復；仍被瀑布流場景綁定引用時後端會拒絕。' })}</p>
         {refs.length > 0 && <ul style={{ margin: '8px 0 0', paddingLeft: 20 }}>{refs.map((ref, i) => <li key={i}>{ref.strategyName}（{ref.refType ?? 'slot'}）</li>)}</ul>}</div>,
       okText: t('common.delete'), cancelText: t('common.cancel'), okButtonProps: { danger: true },
       onOk: async () => {
@@ -114,7 +117,7 @@ export default function SimilarAlgorithmLibrary() {
           await deleteAdAlgorithm(record.id as number)
           message.success(t('common.deleteSuccess'))
           void load(pagination.current, pagination.pageSize, filter)
-        } catch (error) { message.error(error instanceof Error ? error.message : '刪除失敗') }
+        } catch (error) { message.error(error instanceof Error ? error.message : t('recommend.similar.library.deleteFailed', { defaultValue: '刪除失敗' })) }
       } })
   }
 
@@ -133,12 +136,11 @@ export default function SimilarAlgorithmLibrary() {
     </Space> },
   ]
   return <div className="content-area similar-prototype">
-    <PrototypeHeader title={t('algorithm.algorithmList')} subtitle={<><SimilarEngineIcon /> {SIMILAR_ALGO_NAME}</>}
+    <PrototypeHeader title={t('algorithm.algorithmList')} subtitle={<><SimilarEngineIcon /> {t('recommend.similar.algoName', { defaultValue: SIMILAR_ALGO_NAME })}</>}
       onBack={() => navigate(`/promotion-algorithm?tab=${tab}`)} />
-    <PrototypeNotice />
     <Tabs activeKey={String(scene)} onChange={key => { const next = new URLSearchParams(params); next.set('scene', key); setParams(next); setPagination(p => ({ ...p, current: 1 })) }}
       items={CREATABLE_SCENES.map(item => ({ key: String(item.code), disabled: item.code !== 1,
-        label: item.code === 1 ? item.name : `${item.name}（待開發）` }))} />
+        label: (() => { const name = t(`recommend.similar.scene.name.${item.code}`, { defaultValue: item.name }); return item.code === 1 ? name : `${name}${t('recommend.similar.library.pendingSuffix', { defaultValue: '（待開發）' })}` })() }))} />
     <div className="search-section"><Form form={form} layout="inline" onFinish={next => { setFilter(next); setPagination(p => ({ ...p, current: 1 })) }}>
       <Form.Item name="code" label={t('algorithm.colAlgorithmId')}><Input placeholder={t('waterfall.placeholderSearch')} allowClear /></Form.Item>
       <Form.Item name="name" label={t('algorithm.colAlgorithmName')}><Input placeholder={t('waterfall.placeholderSearch')} allowClear /></Form.Item>

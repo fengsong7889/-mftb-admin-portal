@@ -183,6 +183,59 @@ class AdSimilarAlgorithmParamsTest {
         assertThrows(BusinessException.class, () -> AdSimilarAlgorithmParams.validate(params));
     }
 
+    @SuppressWarnings("unchecked")
+    static Map<String, Object> castRules(Map<String, Object> params) {
+        return (Map<String, Object>) params.get("similarRules");
+    }
+
+    @Test
+    void presentationExtensionKeysAreOptionalThenValidated() {
+        // 存量 v1 参数（无扩展键）仍合法：新键一律可选，不因协议扩展打断存量保存。
+        assertDoesNotThrow(() -> AdSimilarAlgorithmParams.validate(valid()));
+        Map<String, Object> withExtras = valid();
+        Map<String, Object> rules = castRules(withExtras);
+        rules.put("regionScope", "delivery");
+        rules.put("timeSlotPriority", true);
+        rules.put("timeSlotFill", "adjacent");
+        rules.put("insertStyle", "slide");
+        rules.put("insertAnimMs", 1000);
+        assertDoesNotThrow(() -> AdSimilarAlgorithmParams.validate(withExtras));
+        assertThrows(BusinessException.class, () -> {
+            Map<String, Object> bad = valid();
+            castRules(bad).put("regionScope", "global");
+            AdSimilarAlgorithmParams.validate(bad);
+        });
+        assertThrows(BusinessException.class, () -> {
+            Map<String, Object> bad = valid();
+            castRules(bad).put("timeSlotPriority", 1);
+            AdSimilarAlgorithmParams.validate(bad);
+        });
+        assertThrows(BusinessException.class, () -> {
+            Map<String, Object> bad = valid();
+            castRules(bad).put("insertAnimMs", 100);
+            AdSimilarAlgorithmParams.validate(bad);
+        });
+        assertThrows(BusinessException.class, () -> {
+            Map<String, Object> bad = valid();
+            castRules(bad).put("insertStyle", "zoom");
+            AdSimilarAlgorithmParams.validate(bad);
+        });
+    }
+
+    @Test
+    void sameCategoryModeRequiresCategoryMatchLevel() {
+        Map<String, Object> params = valid();
+        Map<String, Object> rules = castRules(params);
+        rules.put("modes", List.of("merchantSimilar", "sameCategory"));
+        rules.put("slot2Source", "sameCategory");
+        // 勾了同類目來源但缺類目層級 → 拒；非法枚举同样拒。
+        assertThrows(BusinessException.class, () -> AdSimilarAlgorithmParams.validate(params));
+        rules.put("categoryMatchLevel", "tertiary");
+        assertDoesNotThrow(() -> AdSimilarAlgorithmParams.validate(params));
+        rules.put("categoryMatchLevel", "quaternary");
+        assertThrows(BusinessException.class, () -> AdSimilarAlgorithmParams.validate(params));
+    }
+
     @Test
     void contentHashIsStableAcrossKeyOrder() {
         Map<String, Object> a = valid();

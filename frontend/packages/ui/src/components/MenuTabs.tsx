@@ -178,7 +178,7 @@ const SUB_PAGE_FULL_TITLE: Record<string, SubPageTitle> = {
       '15': 'i18n:recommend.algoTrafficAd',
       '16': 'i18n:recommend.algoTimeSlotAd',
       // type17 全域相似策略（旧名相似推薦引擎）：未登记时页签只显示「新增算法」，与其它广告不同口径；
-      // 具体场景（瀑布流回插/找相似…）由页面头部跟随 Tab 展示，第一阶段先给策略名占位，i18n 接入时改 key。
+      // 具体场景（交互式推薦/找相似…）由页面头部跟随 Tab 展示，第一阶段先给策略名占位，i18n 接入时改 key。
       '17': '全域相似策略',
     },
   },

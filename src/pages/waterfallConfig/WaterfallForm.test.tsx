@@ -82,8 +82,8 @@ describe('瀑布流布局及算法字段显示', () => {
     const draft = { ...emptyDraft('groupBuy', 'flashBee'), key: 'new_groupBuy_similar', strategyName: '相似推薦布局', displayCategoryMode: 'category' as const }
     writeDraft(draft)
     await act(async () => { renderForm('/promotion-slot-config-add?biz=groupBuy&draftKey=new_groupBuy_similar') })
-    // 第五轮场景化重构后绑定区引擎下拉名为「引擎版本」；旧断言引用的 SIMILAR_ALGO_NAME 标题已不在绑定区
-    const selector = screen.getByRole('combobox', { name: '引擎版本' })
+    // 2026-11-25 绑定区再精简：字段更名「交互式推薦算法」且非必填（開關+下拉同行），仍嵌於行為設置柵格内
+    const selector = screen.getByRole('combobox', { name: '交互式推薦算法' })
     const behavior = screen.getByRole('switch', { name: zh.promotionSlotConfig.filterDislike }).parentElement!.parentElement!
     expect(behavior).toContainElement(selector)
     expect(screen.queryByText('詳情返回相似推薦')).not.toBeInTheDocument()

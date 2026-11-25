@@ -812,11 +812,62 @@
   user-select: none;
   touch-action: manipulation;
 }
-/* 门店搜索框借用了 .ap-card 的外观，但它是输入控件，必须保留选中与编辑能力 */
+/* 原型内鼠标拖拽用于滚动：默认关闭文本可选，输入控件保留编辑与选择能力。 */
+.ap-stage,
+.ap-stage * {
+  -webkit-user-select: none;
+  user-select: none;
+}
 .ap-stage input,
-.ap-stage textarea {
+.ap-stage textarea,
+.ap-stage select,
+.ap-stage [contenteditable="true"] {
   -webkit-user-select: text;
   user-select: text;
+}
+/* 纵向页面主体/说明面板/筛选面板保留双向触摸滚动；横滑区只保留横向手势。 */
+.ap-stage,
+.ap-body,
+.ap-spec-panel,
+.apg-more-scroll,
+.apg-panel-options {
+  touch-action: pan-x pan-y;
+}
+.ap-date-strip,
+.apc-hscroll-row,
+.apc-hscroll,
+.apg-hotwords,
+.apg-filters,
+.apg-sortbar-scroll,
+.apg-tabs,
+.apg-flash-hscroll,
+.apd-benefits,
+.apd-services,
+.apg-dfilter-promos,
+.apmf-banner-scroll {
+  touch-action: pan-x;
+}
+.ap-body,
+.ap-spec-panel,
+.apg-more-scroll,
+.apg-panel-options,
+.ap-date-strip,
+.apc-hscroll-row,
+.apc-hscroll,
+.apg-hotwords,
+.apg-filters,
+.apg-sortbar-scroll,
+.apg-tabs,
+.apg-flash-hscroll,
+.apd-benefits,
+.apd-services,
+.apg-dfilter-promos,
+.apmf-banner-scroll {
+  cursor: grab;
+}
+.ap-stage.is-drag-scrolling,
+.ap-stage.is-drag-scrolling * {
+  cursor: grabbing !important;
 }
 /* 滚到边界不再把滚动传给浏览器，避免真机「下拉刷新」把整个 APP 页拽走 */
 .ap-body,

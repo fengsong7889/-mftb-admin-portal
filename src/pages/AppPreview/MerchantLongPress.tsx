@@ -88,8 +88,10 @@ export default function MerchantLongPress({
   const handlePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (event.pointerType === 'mouse' && event.button !== 0) return
     clearTimer()
+    const host = event.currentTarget
     startRef.current = { x: event.clientX, y: event.clientY }
     timerRef.current = window.setTimeout(() => {
+      if (host.closest('.ap-stage.is-drag-scrolling')) return
       const start = startRef.current
       if (start) openMenu(start.x, start.y, event.target)
     }, LONG_PRESS_MS)
@@ -98,6 +100,10 @@ export default function MerchantLongPress({
   const handlePointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
     const start = startRef.current
     if (!start) return
+    if (event.currentTarget.closest('.ap-stage.is-drag-scrolling')) {
+      clearTimer()
+      return
+    }
     if (Math.hypot(event.clientX - start.x, event.clientY - start.y) > MOVE_TOLERANCE) clearTimer()
   }
 

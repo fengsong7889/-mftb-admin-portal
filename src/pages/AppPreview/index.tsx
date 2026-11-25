@@ -9,7 +9,7 @@
  * 缺省展示两个用户端 APP 并排；加 app 参数可单独查看某一个。
  */
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import PhoneFrame from './PhoneFrame'
 import MerchantApp from './MerchantApp'
 import ConsumerApp from './ConsumerApp'
@@ -18,6 +18,125 @@ import { HighlightProvider, useHighlightProvider } from './SpecHighlight'
 import { MerchantPreferenceProvider } from './MerchantPreference'
 import { SPEC_PANELS, loadSpecs, saveSpecs, type SpecEntry, type SpecPanelKey } from './groupBuySpec'
 import './appPreview.css'
+
+const DRAG_SCROLL_THRESHOLD = 5
+const DRAG_CLICK_SUPPRESS_MS = 320
+
+function isEditableTarget(target: EventTarget | null) {
+  return target instanceof Element && Boolean(target.closest('input, textarea, select, [contenteditable="true"]'))
+}
+
+/** 鼠标拖拽滚动：从命中元素向上找最近可滚容器，横纵方向按实际 overflow 与主位移锁定。 */
+function findDragScrollContainer(stage: HTMLElement, target: EventTarget | null) {
+  let element = target instanceof Element ? target : null
+  while (element && element !== stage.parentElement) {
+    const style = window.getComputedStyle(element)
+    const canX = /(auto|scroll)/.test(style.overflowX) && element.scrollWidth > element.clientWidth + 1
+    const canY = /(auto|scroll)/.test(style.overflowY) && element.scrollHeight > element.clientHeight + 1
+    if (canX || canY) return { element, canX, canY }
+    element = element.parentElement
+  }
+  return null
+}
+
+/** 在原型舞台内委托鼠标事件；输入框保留文本选择，拖过阈值后抑制随后 click。 */
+function installAppPreviewDragScroll(stage: HTMLElement) {
+  let drag: {
+    container: Element
+    startX: number
+    startY: number
+    startScrollLeft: number
+    startScrollTop: number
+    canX: boolean
+    canY: boolean
+    axis: 'x' | 'y' | null
+    moved: boolean
+  } | null = null
+  let suppressClickUntil = 0
+
+  const removeWindowListeners = () => {
+    window.removeEventListener('mousemove', handleMouseMove)
+    window.removeEventListener('mouseup', handleMouseUp, true)
+    window.removeEventListener('blur', handleMouseUp)
+  }
+
+  const handleMouseDown = (event: MouseEvent) => {
+    if (event.button !== 0 || isEditableTarget(event.target)) return
+    if (event.target instanceof Element && event.target.closest('.merchant-action-backdrop')) return
+    const found = findDragScrollContainer(stage, event.target)
+    if (!found) return
+    drag = {
+      container: found.element,
+      startX: event.clientX,
+      startY: event.clientY,
+      startScrollLeft: found.element.scrollLeft,
+      startScrollTop: found.element.scrollTop,
+      canX: found.canX,
+      canY: found.canY,
+      axis: null,
+      moved: false,
+    }
+    window.addEventListener('mousemove', handleMouseMove, { passive: false })
+    window.addEventListener('mouseup', handleMouseUp, true)
+    window.addEventListener('blur', handleMouseUp)
+  }
+
+  const handleMouseMove = (event: MouseEvent) => {
+    if (!drag) return
+    const dx = event.clientX - drag.startX
+    const dy = event.clientY - drag.startY
+    if (Math.abs(dx) < DRAG_SCROLL_THRESHOLD && Math.abs(dy) < DRAG_SCROLL_THRESHOLD) return
+    if (!drag.axis) {
+      const absX = Math.abs(dx)
+      const absY = Math.abs(dy)
+      if (drag.canX && (!drag.canY || absX >= absY)) drag.axis = 'x'
+      else if (drag.canY) drag.axis = 'y'
+      else return
+    }
+    drag.moved = true
+    event.preventDefault()
+    stage.classList.add('is-drag-scrolling')
+    if (drag.axis === 'x') drag.container.scrollLeft = drag.startScrollLeft - dx
+    else drag.container.scrollTop = drag.startScrollTop - dy
+  }
+
+  const handleMouseUp = () => {
+    if (!drag) return
+    if (drag.moved) suppressClickUntil = Date.now() + DRAG_CLICK_SUPPRESS_MS
+    drag = null
+    stage.classList.remove('is-drag-scrolling')
+    removeWindowListeners()
+  }
+
+  const handleClickCapture = (event: MouseEvent) => {
+    if (Date.now() >= suppressClickUntil) return
+    suppressClickUntil = 0
+    event.preventDefault()
+    event.stopPropagation()
+  }
+
+  const handleSelectStart = (event: Event) => {
+    if (isEditableTarget(event.target)) return
+    event.preventDefault()
+  }
+
+  const handleDragStart = (event: DragEvent) => {
+    if (isEditableTarget(event.target)) return
+    event.preventDefault()
+  }
+
+  stage.addEventListener('mousedown', handleMouseDown, true)
+  stage.addEventListener('click', handleClickCapture, true)
+  stage.addEventListener('selectstart', handleSelectStart, true)
+  stage.addEventListener('dragstart', handleDragStart, true)
+  return () => {
+    handleMouseUp()
+    stage.removeEventListener('mousedown', handleMouseDown, true)
+    stage.removeEventListener('click', handleClickCapture, true)
+    stage.removeEventListener('selectstart', handleSelectStart, true)
+    stage.removeEventListener('dragstart', handleDragStart, true)
+  }
+}
 
 /** desc 支持 **加粗** 标记：按序拆成 普通/加粗 段渲染（说明文案重点标记口径），不用 innerHTML */
 function renderDesc(text: string) {
@@ -66,11 +185,18 @@ export default function AppPreview() {
   const [params] = useSearchParams()
   const appParam = params.get('app')
   const fromTab = params.get('from') || 'app'
+  const stageRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const stage = stageRef.current
+    if (!stage) return
+    return installAppPreviewDragScroll(stage)
+  }, [appParam])
 
   // 单 APP 模式（商家端或指定用户端）
   if (appParam === 'merchant') {
     return (
-      <div className="ap-stage">
+      <div ref={stageRef} className="ap-stage">
         <button type="button" className="ap-exit" onClick={() => navigate(`/portal?tab=${fromTab}`)}>‹ 返回企業門戶</button>
         <PhoneFrame><MerchantApp /></PhoneFrame>
       </div>
@@ -78,7 +204,7 @@ export default function AppPreview() {
   }
   if (appParam === 'consumer') {
     return (
-      <div className="ap-stage">
+      <div ref={stageRef} className="ap-stage">
         <button type="button" className="ap-exit" onClick={() => navigate(`/portal?tab=${fromTab}`)}>‹ 返回企業門戶</button>
         <PhoneFrame><MerchantPreferenceProvider><ConsumerApp /></MerchantPreferenceProvider></PhoneFrame>
       </div>
@@ -86,7 +212,7 @@ export default function AppPreview() {
   }
   if (appParam === 'mfood') {
     return (
-      <div className="ap-stage">
+      <div ref={stageRef} className="ap-stage">
         <button type="button" className="ap-exit" onClick={() => navigate(`/portal?tab=${fromTab}`)}>‹ 返回企業門戶</button>
         <PhoneFrame><MerchantPreferenceProvider><MfoodApp /></MerchantPreferenceProvider></PhoneFrame>
       </div>
@@ -95,7 +221,7 @@ export default function AppPreview() {
 
   // 缺省：两个用户端 APP 并排展示 + 右侧字段说明表格
   return (
-    <div className="ap-stage ap-stage--dual">
+    <div ref={stageRef} className="ap-stage ap-stage--dual">
       <button type="button" className="ap-exit" onClick={() => navigate(`/portal?tab=${fromTab}`)}>‹ 返回企業門戶</button>
       <DualView />
     </div>

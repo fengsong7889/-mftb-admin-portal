@@ -4226,6 +4226,23 @@
       "comment": "2026-11-03 拉取 main 後把 sys_schema_version 與 catalog 逐鍵對賬時發現：321/325/326 三條菜單遷移裡，上一次補登記（29258ebf）只補了 325/326 兩條，321 的執行記錄（庫裡 applied_at=2026-11-01 00:03:32）仍不在台賬裡，違反「登記先行」，導致免登預檢與交付對賬看不到本條。MigrationCatalogTest 只校驗清單內部一致性（唯一鍵/依賴存在/無環），不校驗代碼側 applyOnce 是否都已登記，所以 CI 抓不到這類漏登記；執行真值始終在 DataInitializer（versionTracker.applyOnce(「ads:merchant-score-menu-rename-v1」, this::renameMerchantScoreInsightMenu)），本登記不觸發二次執行。依賴取 core:menu-seed-v46：它是當前代碼裡 V_MENU_SEED 的門控鍵，本條在代碼順序上確實晚於菜單種子；首次執行時（2026-11-01）庫裡生效的還是更早的 seed 版本，不改變「必須在種子之後」這個約束。守衛：UPDATE 帶舊名「商家評分透視」作條件，運營在「菜單配置」裡自定義過的名稱不命中；已改名環境命中 0 行屬正常幂等。參考 SQL: sql/321_rename_merchant_score_menu.sql"
     },
     {
+      "versionKey": "ads:promotion-word-library-menu-rename-v1",
+      "module": "ads",
+      "phase": "MENU_SEED",
+      "executionType": "JAVA",
+      "executor": "dataInitializer",
+      "status": "ACTIVE",
+      "dependencies": [
+        "core:menu-seed-v46"
+      ],
+      "scriptFiles": [
+        "345_promotion_word_library_menu_rename.sql"
+      ],
+      "intent": "「詞庫管理」更名為「算法推薦詞庫」：菜單名帶上歸屬，不再與搜索運營系統的「搜索詞庫」混淆",
+      "author": "Qoder",
+      "comment": "本菜單在「商家推廣工具」下供算法推薦取詞，與搜索側的分詞/同義/熱搜/停用四庫分屬兩套；原名不帶歸屬，用戶在界面裡會讀成搜索詞庫。種子側同步改成新名（新庫直接寫新值），存量庫靠本條收斂：seedSystemMenus 只新增不覆蓋存量 name，seedMenuEnglishNames 也只填 NULL/空值，改種子對已跑過的環境無效。守衛：UPDATE 帶舊默認名作條件（name_en 額外接管 NULL/空值與歷史默認名 Word Library），運營自定義過的名稱不命中；命中 0 行屬正常幂等。除 sys_menu 外還必須改 sys_translation 的 menu.promotion-word-library 行：TranslationDataInitializer.syncMenuNames 僅「插入不存在」的菜單行、從不更新已有行，而簡中/日/韓/俄界面取菜單名走的是 bundle 裡的 menu.* 鍵（見前端 translateMenuName），不改這一行則後端菜單表改了名、側邊欄仍顯示舊名。該行只改 zh-TW/en 兩個值，其餘語言整鍵刪除，交給同一啟動鏈裡的 backfillZhCn（只補空缺）與自動機翻重新補齊——寫空串會讓 i18next 認為「該語言有值」而不再回落，反而顯示空白。menu_key 不變，權限矩陣/路由/列配置/埋點不需要同步。後置校驗只斷言「仍是歷史默認名的行已不存在」，不斷言等於新名，否則運營自定義過名稱的環境會被 verify 判失敗並無限重試。參考 SQL: sql/345_promotion_word_library_menu_rename.sql"
+    },
+    {
       "versionKey": "organic:retire-plt02a-v1",
       "module": "organic",
       "phase": "DATA_MIGRATION",

@@ -636,7 +636,7 @@ function PromotionSlotConfigForm() {
       {/* 展示与过滤设置 */}
       <div style={cardShellStyle}>
         {cardTitle(<AppstoreOutlined style={{ fontSize: 14, color: '#722ed1' }} />, '#f9f0ff', t('promotionSlotConfig:displayFilterSection'))}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 24, alignItems: 'start' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 24, alignItems: 'start' }}>
           {supportsContentConfig && (
             <div>
               <div style={{ fontSize: 13, color: '#595959', marginBottom: 8 }}>{t('promotionSlotConfig:displayDimension')}</div>
@@ -663,6 +663,26 @@ function PromotionSlotConfigForm() {
             </div>
             <Switch aria-label={t('promotionSlotConfig:filterDislike')} checked={filterDislike} disabled={isDetailMode || importing} checkedChildren={t('promotionSlotConfig:enabled')} unCheckedChildren={t('promotionSlotConfig:disabled')} onChange={c => { setFilterDislike(c); setHasUnsavedChanges(true) }} />
           </div>
+          {/* 自然流量兜底算法提前到绑定区之前：与展示佈局／過濾不喜歡／交互式推薦算法同排四配置（2026-11-25 用户口径）。 */}
+          {!supportsContentConfig && (
+            <div>
+              <div style={{ fontSize: 13, color: '#595959', marginBottom: 8 }}>
+                <span style={{ color: '#FF4D4F', marginRight: 4 }}>*</span>
+                {t('promotionSlotConfig:naturalFallback')}
+                <Popover content={<div style={{ maxWidth: 320, fontSize: 12, lineHeight: '20px', color: '#595959' }}>{t('promotionSlotConfig:naturalFallbackPopover')}</div>} trigger="hover">
+                  <QuestionCircleOutlined style={{ color: '#8c8c8c', fontSize: 13, cursor: 'pointer', marginLeft: 6 }} />
+                </Popover>
+              </div>
+              <Select
+                value={naturalAlgoId}
+                onChange={(val) => { setNaturalAlgoId(val); setNaturalAlgoName(algorithmOptions.find(a => a.value === val)?.label); setHasUnsavedChanges(true) }}
+                placeholder={t('promotionSlotConfig:selectFallbackAlgo')} allowClear showSearch optionFilterProp="label"
+                style={{ width: '100%', maxWidth: 320 }} disabled={isDetailMode || importing}
+                options={naturalAlgoDisplayOptions}
+              />
+              <div style={{ fontSize: 12, color: '#8c8c8c', marginTop: 6 }}>{t('promotionSlotConfig:naturalFallbackHint')}</div>
+            </div>
+          )}
           {/* 相似推荐场景绑定：独立 PUT 保存，不并入瀑布流基础保存请求。 */}
           <WaterfallBinding waterfallId={isServer ? Number(editIdParam) : undefined} brand={brand}
             businessType={isGroupBuy ? 2 : 1} bizChannel={isGroupBuy ? 3 : bizChannel === 'supermarket' ? 2 : 1}
@@ -683,25 +703,6 @@ function PromotionSlotConfigForm() {
                 ]}
               />
               <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 8 }}>{displayCategoryHint}</div>
-            </div>
-          )}
-          {!supportsContentConfig && (
-            <div>
-              <div style={{ fontSize: 13, color: '#595959', marginBottom: 8 }}>
-                <span style={{ color: '#FF4D4F', marginRight: 4 }}>*</span>
-                {t('promotionSlotConfig:naturalFallback')}
-                <Popover content={<div style={{ maxWidth: 320, fontSize: 12, lineHeight: '20px', color: '#595959' }}>{t('promotionSlotConfig:naturalFallbackPopover')}</div>} trigger="hover">
-                  <QuestionCircleOutlined style={{ color: '#8c8c8c', fontSize: 13, cursor: 'pointer', marginLeft: 6 }} />
-                </Popover>
-              </div>
-              <Select
-                value={naturalAlgoId}
-                onChange={(val) => { setNaturalAlgoId(val); setNaturalAlgoName(algorithmOptions.find(a => a.value === val)?.label); setHasUnsavedChanges(true) }}
-                placeholder={t('promotionSlotConfig:selectFallbackAlgo')} allowClear showSearch optionFilterProp="label"
-                style={{ width: '100%', maxWidth: 320 }} disabled={isDetailMode || importing}
-                options={naturalAlgoDisplayOptions}
-              />
-              <div style={{ fontSize: 12, color: '#8c8c8c', marginTop: 6 }}>{t('promotionSlotConfig:naturalFallbackHint')}</div>
             </div>
           )}
         </div>

@@ -36,7 +36,7 @@ export interface SceneMeta {
 }
 
 export const SIMILAR_SCENES: SceneMeta[] = [
-  { code: 1, key: 'detail_return', name: '瀑布流回插', icon: '↩️',
+  { code: 1, key: 'detail_return', name: '交互式推薦', icon: '↩️',
     triggerLabel: '點擊商家→返回事件', seedSource: 'merchant_anchor', seedLabel: '被點擊商家 I2I ＋ 用戶 U2I',
     displayContract: 'insert_1_2', displayLabel: '原瀑布流插入 1–2 家', paidEligible: true, status: 'enabled',
     summary: '瀑布流中點擊某商家後，以該商家為錨點找相似商家；用戶返回時將推薦商家插入原瀑布流。' },

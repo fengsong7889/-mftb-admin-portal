@@ -439,11 +439,13 @@ describe('P1 我的工作記錄（台账单一视图·真实契约）', () => {
       history: [{ at: today, progress: 50 }, { at: dayjs(today).add(7, 'day').format('YYYY-MM-DD'), progress: 80 }],
     }))
     const { container } = mount(<MemoryRouter><WorklogGantt /></MemoryRouter>)
-    await waitFor(() => expect(container.querySelector('.wg-prog-num')?.textContent).toBe('50%'))
+    // AnimatedNumber 走 rAF 缓动（1200ms），其进度按 rAF 调度次数而非墙钟推进；
+    // 全量套件 CPU 争抢下会慢于真实时间，等待上限抬到 8000ms（与全局 asyncUtilTimeout 同口径），断言值不动。
+    await waitFor(() => expect(container.querySelector('.wg-prog-num')?.textContent).toBe('50%'), { timeout: 8000 })
     await user.click(container.querySelector<HTMLElement>('.wg-c--prog')!)
     const popover = document.querySelector('.ant-popover:not(.ant-popover-hidden)') as HTMLElement
     expect(within(popover).getByText('目前最新')).toBeTruthy()
-    expect(popover.querySelector('.wg-prog-pop__live b')?.textContent).toBe('80%')
+    await waitFor(() => expect(popover.querySelector('.wg-prog-pop__live b')?.textContent).toBe('80%'), { timeout: 8000 })
     expect(within(popover).getByText('往期快照')).toBeTruthy()
     expect(popover.querySelector('.wg-snap__value b')?.textContent).toBe('50%')
   }, 30000)

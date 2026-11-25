@@ -7,6 +7,7 @@
  */
 import { useEffect, useMemo, useState, useId } from 'react'
 import { Button, Select, Switch, message } from 'antd'
+import { useTranslation } from 'react-i18next'
 import { useAuth } from '@/contexts/AuthContext'
 import HelpPopover from '@/components/HelpPopover'
 import {
@@ -15,7 +16,7 @@ import {
 } from '@/api/adPromotion'
 import SimilarTrialButton from './TrialButton'
 import { SIMILAR_ALGO_NAME, readSimilarParams, type PrototypeValues } from './prototype'
-import { SIMILAR_SCENES, sceneByCode, sceneFromParams } from './scenes'
+import { sceneFromParams } from './scenes'
 import './index.css'
 
 interface Props {
@@ -31,9 +32,10 @@ interface Props {
   readOnly: boolean
 }
 
-/** 瀑布流“展示与过滤设置”内的相似推荐场景绑定：场景注册表驱动，选择即启用意图，保存走独立 PUT。
- * 界面按 2026-11-21 用户口径保持精简：只留场景选择与引擎版本绑定，
- * 场景契约标签/描述段落/覆盖项预设块已撤除（原型算法表单侧仍保留完整配置）。 */
+/** 瀑布流“展示與過濾設置”内的相似推荐场景绑定：选择即启用意图，保存走独立 PUT。
+ * 界面按 2026-11-25 用户口径精简：删除「引擎版本」手选，字段更名「交互式推薦算法」且非必填——
+ * 啟用開關可隨時關閉（關閉即不啟用綁定），算法下拉可清空；保存绑定时自动引用该算法最新已发布版本。
+ * 与展示佈局／過濾不喜歡／自然流量兜底算法同排四配置（表单侧栅格 minmax 220 保证四列）。 */
 export default function WaterfallBinding(props: Props) {
   const { user } = useAuth()
   const key = JSON.stringify([user?.username ?? '', props.waterfallId, props.brand, props.businessType, props.bizChannel, props.contentType])
@@ -41,25 +43,25 @@ export default function WaterfallBinding(props: Props) {
 }
 
 function BindingSession({ waterfallId, brand, businessType, bizChannel, contentType, columns, readOnly }: Props) {
+  const { t } = useTranslation()
   const id = useId()
   const [binding, setBinding] = useState<WaterfallRecommendation | null>(null)
   const [algorithms, setAlgorithms] = useState<AdAlgorithm[]>([])
   const [revisionsByAlgo, setRevisionsByAlgo] = useState<Record<number, AlgorithmRevision[]>>({})
   const [trafficOptions, setTrafficOptions] = useState<AdAlgorithm[]>([])
-  const [revisionId, setRevisionId] = useState<number | undefined>(undefined)
+  const [algorithmId, setAlgorithmId] = useState<number | undefined>(undefined)
   const [enabled, setEnabled] = useState(false)
   const [scope, setScope] = useState<1 | 2>(1)
   const [trafficIds, setTrafficIds] = useState<number[]>([])
   const [saving, setSaving] = useState(false)
-  // 场景注册表状态：首期仅「詳情返回插入」有后端绑定持久化，其余场景仅可选择、不可保存。
-  const [sceneCode, setSceneCode] = useState<number>(1)
-  const scene = sceneByCode(sceneCode) ?? SIMILAR_SCENES[0]
-  const persisted = scene.code === 1
   const disabled = readOnly || waterfallId == null || contentType !== 'store'
-  // 引用过滤：只列出归属当前场景的引擎算法，APP 側同口径，不串場景。
+  // 引用过滤：只列出交互式推薦（场景 1）的引擎算法，APP 側同口径，不串場景。
   const sceneAlgorithms = useMemo(() => algorithms.filter(a => {
-    try { return sceneFromParams(a.params ? JSON.parse(a.params) : null) === sceneCode } catch { return false }
-  }), [algorithms, sceneCode])
+    try { return sceneFromParams(a.params ? JSON.parse(a.params) : null) === 1 } catch { return false }
+  }), [algorithms])
+  const selectedAlgorithm = sceneAlgorithms.find(a => a.id === algorithmId)
+  // 引擎版本不再手选：保存时自动引用该算法最新已发布版本（列表首项即最新版本）。
+  const selectedRevision = selectedAlgorithm ? revisionsByAlgo[selectedAlgorithm.id as number]?.[0] : undefined
 
   useEffect(() => {
     if (!brand) { setAlgorithms([]); setTrafficOptions([]); return }
@@ -78,9 +80,7 @@ function BindingSession({ waterfallId, brand, businessType, bizChannel, contentT
         if (!active) return
         setBinding(res)
         if (res.configured) {
-          // 当前后端只会返回已持久化的场景 1；注册表就绪后多场景绑定直接按 sceneCode 恢复。
-          setSceneCode(sceneByCode(res.sceneCode)?.code ?? 1)
-          setRevisionId(res.algorithmRevisionId)
+          setAlgorithmId(res.algorithmId)
           setEnabled(res.enabled === 1)
           setScope(res.candidateScope === 2 ? 2 : 1)
           setTrafficIds(res.trafficAlgorithmIds ?? [])
@@ -89,7 +89,7 @@ function BindingSession({ waterfallId, brand, businessType, bizChannel, contentT
       .catch(() => { if (active) setBinding(null) })
     return () => { active = false }
   }, [waterfallId])
-  // 版本选项随可用算法一次性拉取；算法停用后其版本不再作为新选项，已绑定版本显示为失效。
+  // 版本随可用算法一次性拉取，仅用于取各算法最新发布版与试算参数；算法停用后不再作为新选项。
   useEffect(() => {
     if (sceneAlgorithms.length === 0) { setRevisionsByAlgo({}); return }
     let active = true
@@ -102,8 +102,6 @@ function BindingSession({ waterfallId, brand, businessType, bizChannel, contentT
     return () => { active = false }
   }, [sceneAlgorithms])
 
-  const allRevisions = useMemo(() => Object.values(revisionsByAlgo).flat(), [revisionsByAlgo])
-  const selectedRevision = allRevisions.find(r => r.id === revisionId)
   const trialValues: PrototypeValues | null = useMemo(() => {
     if (!selectedRevision) return null
     try {
@@ -114,72 +112,65 @@ function BindingSession({ waterfallId, brand, businessType, bizChannel, contentT
   }, [selectedRevision, businessType])
   // 试算使用匿名权益样例：真实扣量以服务端允许集合与订单权益为准。
   const trialBinding = { enabled: !!selectedRevision && enabled, trafficOnly: scope === 2, trafficSources: scope === 2 && trafficIds.length > 0 ? ['sample-traffic-a', 'sample-traffic-b'] : [] }
-  const blocked = !persisted ? ''
-    : contentType !== 'store' ? '本期僅支援商家內容；商品瀑布流暫不開放相似推薦綁定。'
-    : waterfallId == null ? '請先保存為正式瀑布流記錄，再配置場景綁定。'
-    : revisionId != null && !selectedRevision ? '已綁定版本不可用（算法停用或版本缺失），請改選或停用綁定。'
-    : !selectedRevision ? '請選擇算法與已發布版本；未選擇即禁用。'
-    : scope === 2 && trafficIds.length === 0 ? '僅投流候選必須至少選擇一個允許的投流算法。' : ''
+  const blocked = contentType !== 'store' ? t('recommend.similar.binding.productBlocked', { defaultValue: '本期僅支援商家內容；商品瀑布流暫不開放相似推薦綁定。' })
+    : waterfallId == null ? t('recommend.similar.binding.draftBlocked', { defaultValue: '請先保存為正式瀑布流記錄，再配置場景綁定。' })
+    : enabled && !selectedAlgorithm ? t('recommend.similar.binding.needAlgorithm', { defaultValue: '開啟後須選擇交互式推薦算法；不需要請關閉開關。' })
+    : enabled && selectedAlgorithm && !selectedRevision ? t('recommend.similar.binding.needRevision', { defaultValue: '所選算法尚未發布版本，請先在算法庫發布新版本後再保存綁定。' })
+    : enabled && selectedAlgorithm && scope === 2 && trafficIds.length === 0 ? t('recommend.similar.binding.needTraffic', { defaultValue: '僅投流候選必須至少選擇一個允許的投流算法。' }) : ''
+  // 已配置過綁定但當前關閉/清空：仍允許保存以持久化「停用」，版本沿用上次綁定值。
+  const canPersistOff = !!binding?.configured && (!enabled || !selectedAlgorithm)
 
   const handleSave = async () => {
-    if (disabled || !persisted || waterfallId == null || !selectedRevision) return
+    if (disabled || waterfallId == null) return
     setSaving(true)
     try {
+      // 版本由服务端解析该算法的「最新已发布版本」（2026-11-25）：客户端不再拼 algorithmRevisionId；
+      // 停用/清空时不传 algorithmId，服务端沿用上次绑定版本持久化 enabled=0。
       const saved = await updateWaterfallRecommendation(waterfallId, {
-        sceneCode: 1, algorithmRevisionId: selectedRevision.id, enabled: enabled ? 1 : 0,
+        sceneCode: 1, algorithmId: selectedAlgorithm?.id, enabled: enabled ? 1 : 0,
         candidateScope: scope, businessType, bizChannel, trafficAlgorithmIds: scope === 2 ? trafficIds : [],
         expectedVersion: binding?.configured ? binding.version : null,
       })
       setBinding(saved)
-      message.success('相似推薦場景綁定已保存')
+      message.success(t('recommend.similar.binding.saved', { defaultValue: '相似推薦場景綁定已保存' }))
     } catch (error) {
-      message.error(error instanceof Error ? error.message : '保存失敗')
+      message.error(error instanceof Error ? error.message : t('recommend.similar.binding.saveFailed', { defaultValue: '保存失敗' }))
     } finally {
       setSaving(false)
     }
   }
 
-  return <div className="similar-binding" aria-label="相似推薦場景綁定">
-    <div className="similar-binding__label"><label htmlFor={`${id}-scene`}>推薦場景</label>
-      <HelpPopover title="場景註冊表與綁定" ariaLabel="多場景綁定說明" content={[
-        { label: '場景契約', body: '每個場景由註冊表聲明觸發／種子／展示／付費資格四項契約；引擎版本被多場景復用，場景差異由算法實例承載。', tone: 'info' },
-        { label: '詳情返回插入', body: '綁定持久化已開放：選定發布版本後所有商家詳情返回統一使用該規則。', tone: 'neutral' },
-        { label: '找相似／收藏／搜索', body: '綁定持久化與真實渲染待遷移 340 與專屬瀑布流／APP 契約；此處先固化契約，不計入已啟用。', tone: 'warn' },
+  return <div className="similar-binding" aria-label={t('recommend.similar.binding.aria', { defaultValue: '交互式推薦算法綁定' })}>
+    <div className="similar-binding__label"><label htmlFor={`${id}-algorithm`}>{t('recommend.similar.binding.field', { defaultValue: '交互式推薦算法' })}</label>
+      <HelpPopover title={t('recommend.similar.binding.helpTitle', { defaultValue: '交互式推薦綁定口徑' })} ariaLabel={t('recommend.similar.binding.helpAria', { defaultValue: '交互式推薦綁定說明' })} content={[
+        { label: t('recommend.similar.binding.helpScope', { defaultValue: '綁定口徑' }), body: t('recommend.similar.binding.helpScopeBody', { defaultValue: '直接選取「全域相似策略」算法庫·交互式推薦頁簽下配置的算法實例；非必填，開關關閉或清空選擇即不啟用綁定。保存時自動引用該算法最新發布版本。' }), tone: 'info' },
+        { label: t('recommend.similar.binding.helpVersion', { defaultValue: '版本語義' }), body: t('recommend.similar.binding.helpVersionBody', { defaultValue: '算法編輯或新發布不會自動改變已綁定版本；需在本處重新保存綁定纔會升級到最新發布版本，運行側只讀綁定版本。' }), tone: 'warn' },
+        { label: t('recommend.similar.binding.helpContract', { defaultValue: '場景契約' }), body: t('recommend.similar.binding.helpContractBody', { defaultValue: '每個場景由註冊表聲明觸發／種子／展示／付費資格四項契約；其它場景綁定待遷移 340 與專屬瀑布流／APP 契約，當前僅交互式推薦可綁定。' }), tone: 'neutral' },
       ]} />
+      {trialValues && <SimilarTrialButton values={trialValues} binding={trialBinding} columns={columns} disabled={!enabled || !!blocked} />}
     </div>
-    <Select id={`${id}-scene`} aria-label="推薦場景" value={sceneCode} disabled={disabled}
-      onChange={setSceneCode}
-      options={SIMILAR_SCENES.map(item => ({ value: item.code, disabled: item.status === 'reserved',
-        label: `${item.icon} ${item.name}${item.status === 'reserved' ? '（預留・不可綁定）' : ''}` }))} />
-    {persisted && <div className="similar-binding__engine">
-      <div className="similar-binding__label"><label htmlFor={`${id}-revision`}>引擎版本</label>
-        <HelpPopover title={SIMILAR_ALGO_NAME} ariaLabel="全域相似策略說明" content={[
-          { label: '統一觸發', body: '綁定發布版本後，所有商家詳情返回統一使用這條規則，不因投流、星星、新店或自然位置而分別觸發。未選擇版本即禁用。', tone: 'info' },
-          { label: '候選範圍', body: '全部合格商家採自然推薦，不扣廣告額度；僅投流模式只選允許集合內的有效權益商家，按有效曝光扣量。候選不足不自動放寬。', tone: 'neutral' },
-          { label: '版本語義', body: '編輯算法不會改變已綁定版本；升級需在算法頁發布新版本後在此顯式改選。', tone: 'warn' },
-        ]} />
-        {trialValues && <SimilarTrialButton values={trialValues} binding={trialBinding} columns={columns} disabled={!enabled || !!blocked} />}
-      </div>
-      <Select id={`${id}-revision`} aria-label="引擎版本" value={revisionId} disabled={disabled} allowClear showSearch optionFilterProp="label"
-        placeholder={waterfallId == null ? '需正式瀑布流記錄' : '未選擇即禁用'}
-        onChange={value => setRevisionId(value)}
-        notFoundContent="請先在算法庫建立並發布全域相似策略算法"
-        options={allRevisions.map(r => ({ value: r.id, label: `${r.algorithmName ?? '算法'} · V${r.revision}` }))} />
-      {selectedRevision && <div className="similar-binding__options">
-        <label htmlFor={`${id}-enabled`}>啟用場景</label>
-        <Switch id={`${id}-enabled`} disabled={disabled} checked={enabled} onChange={setEnabled} />
-        <label htmlFor={`${id}-scope`}>候選範圍</label>
-        <Select id={`${id}-scope`} value={scope} disabled={disabled}
-          options={[{ value: 1, label: '全部合格商家（自然推薦）' }, { value: 2, label: '僅有效投流商家（有效曝光扣量）' }]}
-          onChange={value => setScope(value)} />
-        {scope === 2 && <><label htmlFor={`${id}-traffic`}>允許的投流算法</label>
-          <Select id={`${id}-traffic`} mode="multiple" allowClear disabled={disabled} placeholder="至少選擇一個"
-            value={trafficIds} onChange={setTrafficIds}
-            options={trafficOptions.map(a => ({ value: a.id as number, label: `${a.algoName}（${a.algoCode}）` }))} /></>}
-        <Button size="small" type="primary" disabled={disabled || !!blocked || saving} onClick={handleSave}>保存綁定</Button>
-      </div>}
+    <div className="similar-binding__row">
+      <Switch id={`${id}-enabled`} aria-label={t('recommend.similar.binding.enableAria', { defaultValue: '啟用交互式推薦' })} disabled={disabled} checked={enabled} onChange={setEnabled} checkedChildren={t('recommend.trafficCfg.on', { defaultValue: '開啟' })} unCheckedChildren={t('recommend.trafficCfg.off', { defaultValue: '關閉' })} />
+      <Select id={`${id}-algorithm`} aria-label={t('recommend.similar.binding.field', { defaultValue: '交互式推薦算法' })} value={algorithmId} disabled={disabled || !enabled} allowClear showSearch optionFilterProp="label"
+        placeholder={t('recommend.similar.binding.placeholder', { defaultValue: '未啟用（可不選）' })}
+        onChange={setAlgorithmId}
+        notFoundContent={t('recommend.similar.binding.notFound', { defaultValue: '請先在算法庫「全域相似策略」的交互式推薦頁簽新增算法並發布版本' })}
+        options={sceneAlgorithms.map(a => ({ value: a.id as number, label: `${a.algoName}（${a.algoCode}）` }))} />
+    </div>
+    {enabled && selectedAlgorithm && <div className="similar-binding__options">
+      <label htmlFor={`${id}-scope`}>{t('recommend.similar.binding.candidateScope', { defaultValue: '候選範圍' })}</label>
+      <Select id={`${id}-scope`} value={scope} disabled={disabled}
+        options={[{ value: 1, label: t('recommend.similar.binding.scopeNatural', { defaultValue: '全部合格商家（自然推薦）' }) }, { value: 2, label: t('recommend.similar.binding.scopeTraffic', { defaultValue: '僅有效投流商家（有效曝光扣量）' }) }]}
+        onChange={value => setScope(value)} />
+      {scope === 2 && <><label htmlFor={`${id}-traffic`}>{t('recommend.similar.binding.trafficAlgorithms', { defaultValue: '允許的投流算法' })}</label>
+        <Select id={`${id}-traffic`} mode="multiple" allowClear disabled={disabled} placeholder={t('recommend.similar.binding.trafficPlaceholder', { defaultValue: '至少選擇一個' })}
+          value={trafficIds} onChange={setTrafficIds}
+          options={trafficOptions.map(a => ({ value: a.id as number, label: `${a.algoName}（${a.algoCode}）` }))} /></>}
+      <Button size="small" type="primary" disabled={disabled || !!blocked || saving} onClick={handleSave}>{t('recommend.similar.binding.save', { defaultValue: '保存綁定' })}</Button>
     </div>}
-    {!persisted && <p role="status" className="similar-binding__pending">該場景綁定持久化與執行待遷移 340 及專屬瀑布流／APP 契約，當前不可綁定。</p>}
+    {canPersistOff && <div className="similar-binding__options">
+      <Button size="small" type="primary" disabled={disabled || saving} onClick={handleSave}>{t('recommend.similar.binding.saveOff', { defaultValue: '保存綁定（停用）' })}</Button>
+    </div>}
     {blocked && <p role="status" className="similar-binding__error">{blocked}</p>}
   </div>
 }

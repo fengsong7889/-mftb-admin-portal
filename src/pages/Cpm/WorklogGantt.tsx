@@ -28,7 +28,7 @@ import {
 // 不加别名会让本地函数把导入顶掉，编译期就报参数不匹配
 import {
   createGroup as apiCreateGroup, createTask as apiCreateTask, deleteGroup as apiDeleteGroup,
-  deleteTask as apiDeleteTask, fetchLedger, importLocalLedger, reorderGroups as apiReorderGroups,
+  deleteTask as apiDeleteTask, fetchLedger, importLocalLedger, isVirtualGroup, reorderGroups as apiReorderGroups,
   restoreGroup as apiRestoreGroup, restoreTask as apiRestoreTask, toImportPayload,
   updateGroup as apiUpdateGroup, updateTask as apiUpdateTask,
 } from './worklogApi'
@@ -319,7 +319,8 @@ export default function WorklogGantt() {
     const origin = data.groups.find(g => g.id === gid)
     if (!origin) return
     setData(d => ({ ...d, groups: d.groups.map(g => g.id !== gid ? g : { ...g, ...patch }) }))
-    if (patch.title !== undefined) {
+    // 虚拟分组（id=0）服务端没有对应行：改名落到它头上只会换来一句「工作項不存在」，界面层先拦住
+    if (patch.title !== undefined && !isVirtualGroup(Number(gid))) {
       void apiUpdateGroup(Number(gid), { title: patch.title, hue: origin.hue }).catch(syncError)
     }
   }
@@ -454,6 +455,8 @@ export default function WorklogGantt() {
     })
   }
   const deleteGroup = (g: GanttGroup) => {
+    // 未分组虚拟容器不可删：它没有服务端行，DELETE /groups/0 只会报「工作項不存在或不属于本人」
+    if (isVirtualGroup(Number(g.id))) return
     Modal.confirm({
       title: t('cpm.gantt.confirm.deleteItemTitle', { defaultValue: '確定刪除整個工作項？' }),
       className: 'custom-confirm-modal',
@@ -688,7 +691,7 @@ export default function WorklogGantt() {
               className="wg-select-group"
               value={groupFilter}
               onChange={v => setGroupFilter(v)}
-              options={[{ value: 'all', label: t('cpm.gantt.search.allItem', { defaultValue: '全部工作項' }) }, ...data.groups.map(g => ({ value: g.id, label: g.title }))]}
+              options={[{ value: 'all', label: t('cpm.gantt.search.allItem', { defaultValue: '全部工作項' }) }, ...data.groups.filter(g => !g.virtual).map(g => ({ value: g.id, label: g.title }))]}
             />
           </Form.Item>
           <Form.Item label={t('cpm.gantt.search.cycle', { defaultValue: '工作週期' })} className="wg-item-cycle">
@@ -863,15 +866,25 @@ export default function WorklogGantt() {
                   <div key={g.id} className="wg-group" style={{ '--group-color': GROUP_COLORS[g.hue % GROUP_COLORS.length] } as CSSProperties}>
                     <div className="wg-req">
                       <div className="wg-req__title">
-                        <InlineText value={g.title} autoEdit={freshId === g.id} onSave={v => patchGroup(g.id, { title: v })} />
+                        {/* 虚拟分组：服务端 title=null 汇成空字符串，直接渲染就是生产上那条「没有名称的工作項」；
+                            它是只读容器，不给 InlineText 改名入口，词由界面按语言给 */}
+                        {g.virtual ? (
+                          <Tooltip title={t('cpm.gantt.req.ungroupedTip', { defaultValue: '未歸檔到工作項的記錄（舊日報流水/關聯導入）。此分組不可改名或刪除，刪除或移動其中的子任務即可清空它。' })}>
+                            <span className="wg-inline">{t('cpm.gantt.req.ungroupedTitle', { defaultValue: '未分組記錄' })}</span>
+                          </Tooltip>
+                        ) : (
+                          <InlineText value={g.title} autoEdit={freshId === g.id} onSave={v => patchGroup(g.id, { title: v })} />
+                        )}
                       </div>
                       <div className="wg-req__ops">
                         <Tooltip title={t('cpm.gantt.req.addTask', { defaultValue: '添加子任務' })}>
                           <Button type="link" size="small" icon={<PlusOutlined />} onClick={() => addTask(g.id)} />
                         </Tooltip>
-                        <Tooltip title={t('cpm.gantt.req.deleteItem', { defaultValue: '刪除工作項' })}>
-                          <Button type="link" size="small" danger icon={<DeleteOutlined />} onClick={() => deleteGroup(g)} />
-                        </Tooltip>
+                        {!g.virtual && (
+                          <Tooltip title={t('cpm.gantt.req.deleteItem', { defaultValue: '刪除工作項' })}>
+                            <Button type="link" size="small" danger icon={<DeleteOutlined />} onClick={() => deleteGroup(g)} />
+                          </Tooltip>
+                        )}
                       </div>
                     </div>
                     <div className="wg-rows">

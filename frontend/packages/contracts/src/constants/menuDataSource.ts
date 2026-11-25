@@ -95,7 +95,7 @@ export const keyToPath: Record<string, string> = {
   'authorization-center': '/authorization-center',
   'function-permission': '/authorization-center',
   'data-permission': '/data-permission',
-  // 商家推广工具 - 词库管理
+  // 商家推广工具 - 算法推荐词库
   'promotion-word-library': '/promotion-word-library',
   // 商家推广工具 - 流量沙盤（实验沙盘：页面为固定演示数据，但路由已注册，必须可点击跳转）
   'waterfall-simulation': '/waterfall-simulation',

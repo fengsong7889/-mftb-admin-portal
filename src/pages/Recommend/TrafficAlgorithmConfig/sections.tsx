@@ -513,7 +513,7 @@ export function RecallSection(props: TrafficSectionProps) {
         />}
       >
         <Fields compact {...props} names={['recallMerchantScope']} disabledWhen={() => true} />
-        <p className="traffic-config__hint">固定口径：仅召回已购本广告的投流商家；「全量商家」为预留档位（待开放），全量曝光由瀑布流自然流承担。</p>
+        <p className="traffic-config__hint">固定口径：仅召回已购投流的商家，后续基于实际需求再陆续开放其它类型的选项，比如人气商家、销量前 X 的商家等等。</p>
       </FieldGroup>
       <FieldGroup
         caption={t('recommend.trafficCfg.cap.c10', { defaultValue: '区域召回范围' })}

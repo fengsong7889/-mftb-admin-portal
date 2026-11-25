@@ -34,7 +34,20 @@ vi.mock('@/hooks/useColumnConfig', () => ({ useColumnConfig: () => ({ configComp
 vi.mock('@/hooks/useCardOrder', () => ({ useCardOrder: () => ({ sortCards: (cards: unknown[]) => cards, getDragProps: () => ({}) }) }))
 vi.mock('@/components/BrandTag', () => ({ default: () => <span>品牌</span> }))
 vi.mock('@/components/HelpPopover', () => ({ default: () => <span>说明</span> }))
-vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }), initReactI18next: { type: '3rdParty', init: () => {} } }))
+// i18n 桩与真 i18next 对齐：取 defaultValue 兜底并对 {{var}} 插值（真源 stub 不插值会让参数化文案断言恒红）。
+// hoisted 供两个 vi.mock 工厂安全引用，避免 mock 工厂先于顶层 const 执行的 TDZ。
+const { stubT } = vi.hoisted(() => ({
+  stubT: (key: string, opts?: Record<string, unknown>) => {
+    let v = typeof opts?.defaultValue === 'string' ? opts.defaultValue : key
+    for (const [k, val] of Object.entries(opts ?? {})) {
+      if (k !== 'defaultValue') v = v.split(`{{${k}}}`).join(String(val))
+    }
+    return v
+  },
+}))
+vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: stubT }), initReactI18next: { type: '3rdParty', init: () => {} } }))
+// prototype.ts 的校验/试算消息走真实 i18n 实例；测试环境 lng 不定，同样桩住以 defaultValue 回落繁中，保持断言口径。
+vi.mock('@/i18n', () => ({ default: { t: stubT }, i18n: { t: stubT } }))
 
 beforeAll(() => {
   configure({ asyncUtilTimeout: 5000 })
@@ -186,13 +199,15 @@ describe('瀑布流场景绑定', () => {
     api.revisions.mockResolvedValue([revision(91, 31, 1, params)])
     api.putBinding.mockResolvedValue({ configured: true, id: 1, waterfallId: 9, sceneCode: 1, algorithmId: 31, algorithmRevisionId: 91, enabled: 1, candidateScope: 1, version: 1, trafficAlgorithmIds: [] })
     render(<ConfigProvider theme={{ token: { motion: false } }}><WaterfallBinding {...props} /></ConfigProvider>)
-    expect(await screen.findByRole('combobox', { name: '引擎版本' })).toBeInTheDocument()
+    expect(await screen.findByRole('combobox', { name: '交互式推薦算法' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '保存綁定' })).not.toBeInTheDocument()
-    await choose('引擎版本', '漢堡相似算法 · V1')
-    fireEvent.click(screen.getByRole('switch', { name: '啟用場景' }))
+    // 2026-11-25 非必填改造：先開啟「啟用交互式推薦」开关，算法下拉才可選。
+    fireEvent.click(screen.getByRole('switch', { name: '啟用交互式推薦' }))
+    await choose('交互式推薦算法', '漢堡相似算法（SFJH0001）')
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: '保存綁定' })) })
     await waitFor(() => expect(api.putBinding).toHaveBeenCalledWith(9, expect.objectContaining({
-      sceneCode: 1, algorithmRevisionId: 91, enabled: 1, candidateScope: 1, expectedVersion: null, trafficAlgorithmIds: [],
+      // 绑定简化（2026-11-25）：客户端只传算法实例，最新已发布版本由服务端解析
+      sceneCode: 1, algorithmId: 31, enabled: 1, candidateScope: 1, expectedVersion: null, trafficAlgorithmIds: [],
     })))
   })
   it('仅投流候选未选允许集合时阻止保存，试算标注付费口径', async () => {
@@ -201,8 +216,8 @@ describe('瀑布流场景绑定', () => {
         : { records: [{ id: 51, algoCode: 'SFTL0001', algoName: '投流A', algoType: 15, brand: 'flashBee', status: 1 }], total: 1 }))
     api.revisions.mockResolvedValue([revision(91, 31, 1, params)])
     render(<ConfigProvider theme={{ token: { motion: false } }}><WaterfallBinding {...props} /></ConfigProvider>)
-    await choose('引擎版本', '漢堡相似算法 · V1')
-    fireEvent.click(screen.getByRole('switch', { name: '啟用場景' }))
+    fireEvent.click(screen.getByRole('switch', { name: '啟用交互式推薦' }))
+    await choose('交互式推薦算法', '漢堡相似算法（SFJH0001）')
     await waitFor(() => expect(screen.getByRole('button', { name: '相似推薦試算' })).not.toBeDisabled())
     await choose('候選範圍', '僅有效投流商家（有效曝光扣量）')
     expect(screen.getByText('僅投流候選必須至少選擇一個允許的投流算法。')).toBeInTheDocument()
@@ -218,7 +233,7 @@ describe('瀑布流场景绑定', () => {
     expect(screen.getByText('請先保存為正式瀑布流記錄，再配置場景綁定。')).toBeInTheDocument()
     local.unmount()
     render(<ConfigProvider theme={{ token: { motion: false } }}><WaterfallBinding {...props} contentType="product" /></ConfigProvider>)
-    expect(screen.getByRole('combobox', { name: '引擎版本' })).toBeDisabled()
+    expect(screen.getByRole('combobox', { name: '交互式推薦算法' })).toBeDisabled()
   })
 })
 

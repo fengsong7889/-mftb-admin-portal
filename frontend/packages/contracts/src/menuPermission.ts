@@ -109,7 +109,7 @@ export const MENU_ACTIONS_MAP: Record<string, Array<{ key: string; label: string
     { key: 'edit', label: '編輯' },
     { key: 'export', label: '導出' },
   ],
-  // 詞庫管理（商家推廣工具）
+  // 算法推薦詞庫（商家推廣工具；345 更名，菜單 key 保持 promotion-word-library）
   'promotion-word-library': [
     { key: 'view', label: '查看' },
     { key: 'create', label: '新增' },

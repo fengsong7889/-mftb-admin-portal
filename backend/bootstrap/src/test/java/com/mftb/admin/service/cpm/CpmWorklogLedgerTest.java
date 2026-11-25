@@ -252,6 +252,45 @@ class CpmWorklogLedgerTest {
     @Test
     @DisplayName("手工工时超上限由服务端拒写：前端校验不是安全边界")
     void manualHoursOverCapRejected() {
+        CpmWorklogService service = newLedgerService();
+
+        CpmWorklogDto.TaskForm form = new CpmWorklogDto.TaskForm();
+        form.setTitle("加班超限");
+        form.setStart(MON.toString());
+        // 11-16 周一到 11-18 周三共 3 个工作日，上限 72h；73 必须被服务端拒绝
+        form.setEnd(MON.plusDays(2).toString());
+        form.setHours(new BigDecimal("73"));
+
+        assertThatThrownBy(() -> service.createTask(form))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("耗時超出上限");
+    }
+
+    /**
+     * 未分组虚拟容器（id=0）的写入口径：改名/删除/恢复一律报「只读容器」，
+     * 而不是汇进「工作項不存在或不属于本人」——生产上用户对着界面渲染出来的
+     * 虚拟分组行点删除，只能看到一句无法自解释的「不存在」。
+     */
+    @Test
+    @DisplayName("虚拟分组 id=0 不可改名/删除/恢复，报错说清只读容器")
+    void virtualGroupIsReadOnly() {
+        CpmWorklogService service = newLedgerService();
+        CpmWorklogDto.GroupForm form = new CpmWorklogDto.GroupForm();
+        form.setTitle("给未分组改名");
+
+        assertThatThrownBy(() -> service.updateGroup(CpmWorklogService.UNGROUPED_ID, form))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("只讀容器");
+        assertThatThrownBy(() -> service.deleteGroup(CpmWorklogService.UNGROUPED_ID))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("只讀容器");
+        assertThatThrownBy(() -> service.restoreGroup(CpmWorklogService.UNGROUPED_ID))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("只讀容器");
+    }
+
+    /** 全套 mock 装配：归属取登录人，日历/周期给固定值，只验服务层口径 */
+    private static CpmWorklogService newLedgerService() {
         CpmWorklogGroupMapper groupMapper = mock(CpmWorklogGroupMapper.class);
         CpmItemMapper itemMapper = mock(CpmItemMapper.class);
         CpmItemUpdateMapper updateMapper = mock(CpmItemUpdateMapper.class);
@@ -267,19 +306,8 @@ class CpmWorklogLedgerTest {
         when(guard.currentUser()).thenReturn(current);
         when(periods.today()).thenReturn(MON);
         when(workdays.load(anyLong(), any(), any())).thenReturn(new CpmWorkdays.Ledger(Map.of()));
-        CpmWorklogService service = new CpmWorklogService(
+        return new CpmWorklogService(
                 groupMapper, itemMapper, updateMapper, calendarMapper, workdays, guard, periods, meetingActions);
-
-        CpmWorklogDto.TaskForm form = new CpmWorklogDto.TaskForm();
-        form.setTitle("加班超限");
-        form.setStart(MON.toString());
-        // 11-16 周一到 11-18 周三共 3 个工作日，上限 72h；73 必须被服务端拒绝
-        form.setEnd(MON.plusDays(2).toString());
-        form.setHours(new BigDecimal("73"));
-
-        assertThatThrownBy(() -> service.createTask(form))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("耗時超出上限");
     }
 
     private static CpmItemUpdate trail(LocalDate date, int progress) {

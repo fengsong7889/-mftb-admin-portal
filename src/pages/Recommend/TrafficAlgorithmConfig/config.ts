@@ -343,7 +343,7 @@ export const TRAFFIC_FIELDS: Record<TrafficFieldName, FieldDefinition> = {
   categoryMatchLevel: { label: '类目匹配层级', group: 'similarRec', kind: 'select', dependencies: ['generativeRecommendEnabled', 'similarRecModes'], options: [
     { label: '一级类目', value: 'primary' }, { label: '二级类目', value: 'secondary' },
   ] },
-  // ── 召回范围·商家侧（锁定口径：只召回已购本广告的投流商家；「全量商家」仅展示预留，执行未接入）──
+  // ── 召回范围·商家侧（锁定口径：只召回已购投流的商家；其它召回类型待后续开放，执行未接入）──
   recallMerchantScope: { label: '商家召回范围', group: 'recall', kind: 'select', options: [
     { label: '仅投流商家', value: 'trafficOnly' }, { label: '全量商家（待开放）', value: 'allMerchants' },
   ] },
@@ -366,7 +366,7 @@ export const TRAFFIC_FIELDS: Record<TrafficFieldName, FieldDefinition> = {
   // 候选池上限已退役：坑位数由瀑布流策略决定，本算法对全量已购商家打分排序；
   // 截断会使长尾广告主永不轮转、违背按购买量消耗。保持挂载透传存量。
   rankPoolSize: numberField('候选池上限', 'ranking', 10, 2000, '家'),
-  // 时段优先＝排序前先按当前餐段过滤候选（主营时段＝当前时段）；不足时只在已购本广告的投流商家内分层补，
+  // 时段优先＝排序前先按当前餐段过滤候选（主营时段＝当前时段）；不足时只在已购投流的商家内分层补，
   // 仍不足由瀑布流按其配置的兜底自然流算法补位（不在本模块配）。
   mealPeriodPriorityEnabled: { label: '时段优先', group: 'recall', kind: 'boolean' },
   mealPeriodFallback: { label: '候选不足补齐', group: 'recall', kind: 'select', dependencies: ['mealPeriodPriorityEnabled'], options: [

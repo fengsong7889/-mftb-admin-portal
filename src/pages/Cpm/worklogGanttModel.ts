@@ -99,6 +99,12 @@ export interface GanttGroup {
   /** GROUP_COLORS 下标，决定合并单元格底色 */
   hue: number
   tasks: GanttTask[]
+  /**
+   * 未分组虚拟分组（服务端 id=0 容器）：只读——不给改名/删除，
+   * 标题由界面按语言渲染「未分組記錄」；里面的子任务照常编辑。
+   * 本地旧台账没有这一档，缺省即真实工作項。
+   */
+  virtual?: boolean
 }
 
 export interface GanttData {

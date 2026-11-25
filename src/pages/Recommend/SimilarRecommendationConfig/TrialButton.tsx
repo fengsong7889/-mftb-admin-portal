@@ -5,6 +5,7 @@
  */
 import { useState } from 'react'
 import { Button, ConfigProvider, Modal } from 'antd'
+import { useTranslation } from 'react-i18next'
 import { CalculatorOutlined } from '@ant-design/icons'
 import ReturnPreview from './ReturnPreview'
 import type { PreviewBinding, PrototypeValues } from './prototype'
@@ -16,12 +17,13 @@ export default function SimilarTrialButton({ values, binding, columns, disabled 
 }) {
   const [open, setOpen] = useState(false)
   const { policy } = useTagDecayPolicy()
+  const { t } = useTranslation()
   return <>
-    <Button type="link" size="small" disabled={disabled} aria-label="相似推薦試算" icon={<CalculatorOutlined aria-hidden />} onClick={() => setOpen(true)}>試算</Button>
-    <Modal open={open} title="相似推薦試算" onCancel={() => setOpen(false)} footer={null} width={960} destroyOnClose>
+    <Button type="link" size="small" disabled={disabled} aria-label={t('recommend.similar.trial.aria', { defaultValue: '相似推薦試算' })} icon={<CalculatorOutlined aria-hidden />} onClick={() => setOpen(true)}>{t('recommend.similar.trial.button', { defaultValue: '試算' })}</Button>
+    <Modal open={open} title={t('recommend.similar.trial.aria', { defaultValue: '相似推薦試算' })} onCancel={() => setOpen(false)} footer={null} width={960} destroyOnClose>
       <ConfigProvider componentDisabled={false}>
         {open && <div className="traffic-trial similar-prototype__trial-modal">
-          <p className="traffic-config__hint">匿名示例，不產生標籤增量或真實曝光。共用全局衰變規則 V{policy.revision}；本例使用已生效標籤，不再重複衰變。</p>
+          <p className="traffic-config__hint">{t('recommend.similar.trial.note', { defaultValue: `匿名示例，不產生標籤增量或真實曝光。共用全局衰變規則 V${policy.revision}；本例使用已生效標籤，不再重複衰變。` })}</p>
           <ReturnPreview key={policy.revision} values={values} binding={binding} columns={columns} />
         </div>}
       </ConfigProvider>

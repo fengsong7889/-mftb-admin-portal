@@ -199,6 +199,8 @@ export interface WaterfallRecommendation {
 export interface WaterfallRecommendationRequest {
   sceneCode: number
   algorithmRevisionId?: number | null
+  /** 绑定简化（2026-11-25）：只传算法实例，服务端解析其最新已发布版本；停用/清空时两者都不传 */
+  algorithmId?: number | null
   enabled: number
   candidateScope: number
   businessType: number

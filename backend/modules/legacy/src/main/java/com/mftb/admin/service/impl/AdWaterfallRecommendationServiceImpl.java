@@ -73,8 +73,18 @@ public class AdWaterfallRecommendationServiceImpl implements AdWaterfallRecommen
             throw new BusinessException(409, "綁定已被修改，請重新載入後再保存");
         }
         AdWaterfallRecommendation binding = existing == null ? new AdWaterfallRecommendation() : existing;
-        Long revisionId = request.getAlgorithmRevisionId() != null
-                ? request.getAlgorithmRevisionId() : binding.getAlgorithmRevisionId();
+        Long revisionId = request.getAlgorithmRevisionId();
+        if (revisionId == null && request.getAlgorithmId() != null) {
+            // 服务端解析最新已发布版本（2026-11-25 绑定简化）：客户端只选算法实例，
+            // 版本归属由服务端裁决，避免客户端缓存的版本列表与服务端漂移。
+            AdAlgorithmRevision latest = revisionMapper.selectOne(new LambdaQueryWrapper<AdAlgorithmRevision>()
+                    .eq(AdAlgorithmRevision::getAlgorithmId, request.getAlgorithmId())
+                    .orderByDesc(AdAlgorithmRevision::getRevision)
+                    .last("LIMIT 1"));
+            if (latest == null) throw new BusinessException(422, "所選算法尚未發布版本，請先在算法庫發布新版本");
+            revisionId = latest.getId();
+        }
+        if (revisionId == null) revisionId = binding.getAlgorithmRevisionId();
         if (revisionId == null) throw new BusinessException(422, "請先選擇相似推薦算法版本");
         AdAlgorithmRevision revision = revisionMapper.selectById(revisionId);
         if (revision == null) throw new BusinessException(422, "算法版本不存在");

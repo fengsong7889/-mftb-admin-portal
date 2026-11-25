@@ -6,7 +6,7 @@
  * 完整许可条款见仓库根目录 LICENSE 文件。
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { I18nextProvider } from 'react-i18next'
@@ -73,6 +73,13 @@ const FIXTURE: GanttData = {
         { id: 't4', title: '商家PC端', start: null, end: null, progress: 0, note: '' },
       ],
     },
+    // 未分组虚拟容器（服务端 id=0，title 汇成空串）：生产上它就是那条「没有名称的工作項」
+    {
+      id: '0', title: '', hue: 0, virtual: true,
+      tasks: [
+        { id: 't9', title: '相似引擎對賬', start: d(0), end: d(1), progress: 0, note: '' },
+      ],
+    },
   ],
   holidays: [d(-5)],
   makeup: [], compOff: [], leave: [],
@@ -115,8 +122,9 @@ describe('统一工作记录视图', () => {
     const { container } = mount()
     await screen.findByText('銷售定價-門店')
     const rows = [...container.querySelectorAll('.wg-left .wg-row__ops')]
-    expect(container.querySelectorAll('.wg-left .wg-row')).toHaveLength(2)
-    expect(rows).toHaveLength(2)
+    // 3 行 = g2 的 t3/t5（本周相交）+ 虚拟分组的 t9；未排期/上周任务不进本期
+    expect(container.querySelectorAll('.wg-left .wg-row')).toHaveLength(3)
+    expect(rows).toHaveLength(3)
     expect(screen.queryByText('商家PC端')).toBeNull()
     expect(screen.getByText(/第\s*\d+\s*週（/)).toBeTruthy()
   })
@@ -129,7 +137,8 @@ describe('统一工作记录视图', () => {
     await user.click(screen.getByText('全部'))
     expect(await screen.findByText('商家PC端')).toBeTruthy()
     expect(await screen.findByText('團購瀑布流調整')).toBeTruthy()
-    expect(container.querySelectorAll('.wg-left .wg-row')).toHaveLength(5)
+    // 6 行 = g1×2 + g2×3 + 虚拟分组×1
+    expect(container.querySelectorAll('.wg-left .wg-row')).toHaveLength(6)
 
     // 标签与控件在同一个 .ant-form-item 下（不是父子关系），用 closest 取行容器
     const planItem = screen.getByText('計劃屬性').closest('.ant-form-item')!
@@ -171,5 +180,25 @@ describe('统一工作记录视图', () => {
     expect(screen.queryByText(/耗時 = 區間工作日/)).toBeNull()
     await user.click(screen.getByRole('button', { name: /工作日口徑/ }))
     expect(await screen.findByText(/耗時 = 區間工作日/)).toBeTruthy()
+  })
+
+  it('未分组虚拟容器：渲染「未分組記錄」，不给改名/删除入口，子任务照常可加', async () => {
+    const user = userEvent.setup()
+    const { container } = mount()
+    await screen.findByText('銷售定價-門店')
+
+    // 空白名称 → 按语言给词，不再是一条没有名称的记录
+    const ungroupedTitle = await screen.findByText('未分組記錄')
+    const virtualReq = ungroupedTitle.closest('.wg-group')!
+    // 只读容器：点标题不进编辑态，也不会把 PUT /groups/0 打出去
+    await user.click(ungroupedTitle)
+    expect(container.querySelectorAll('input.wg-inline, .wg-req input')).toHaveLength(0)
+    // 删除入口直接不给：本周档只剩真实分组 g2 的一颗删除钮（g1 本期无相交任务被滤掉）
+    expect(virtualReq.querySelectorAll('.wg-req__ops .anticon-delete')).toHaveLength(0)
+    expect(container.querySelectorAll('.wg-req__ops .anticon-delete')).toHaveLength(1)
+    // 添加子任務仍可用：服务端 resolveGroupId 把 0 当未分组，本来就能落
+    const ledgerApi = await import('./worklogApi')
+    await user.click(virtualReq.querySelector('.wg-req__ops .anticon-plus')!.closest('button')!)
+    await waitFor(() => expect((ledgerApi.createTask as ReturnType<typeof vi.fn>).mock.calls.at(-1)?.[0].groupId).toBe(0))
   })
 })

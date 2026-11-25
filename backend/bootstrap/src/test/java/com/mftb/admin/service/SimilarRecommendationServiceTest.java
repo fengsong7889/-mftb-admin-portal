@@ -32,6 +32,7 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -162,6 +163,38 @@ class SimilarRecommendationServiceTest {
         when(algorithmMapper.selectById(17L)).thenReturn(algorithm(17L, 17, "flashBee", 2));
         assertEquals(422, assertThrows(BusinessException.class,
                 () -> recommendationService.put(5L, request(1, List.of()))).getCode());
+    }
+
+    @Test
+    void putResolvesLatestRevisionFromAlgorithmId() {
+        // 绑定简化（2026-11-25）：客户端只传算法实例，服务端解析该算法最新已发布版本落库。
+        stubHappyPath("flashBee");
+        AdAlgorithmRevision latest = new AdAlgorithmRevision();
+        latest.setId(92L);
+        latest.setAlgorithmId(17L);
+        latest.setRevision(3);
+        latest.setParamsSnapshot(similarParams());
+        when(revisionMapper.selectOne(any())).thenReturn(latest);
+        when(revisionMapper.selectById(92L)).thenReturn(latest);
+        AdWaterfallRecommendationRequest request = request(1, List.of());
+        request.setAlgorithmRevisionId(null);
+        request.setAlgorithmId(17L);
+        recommendationService.put(5L, request);
+        ArgumentCaptor<AdWaterfallRecommendation> captor = ArgumentCaptor.forClass(AdWaterfallRecommendation.class);
+        verify(recommendationMapper).insert(captor.capture());
+        assertEquals(92L, captor.getValue().getAlgorithmRevisionId());
+
+        // 无已发布版本时拒绝：不建立引用空版本的绑定，也不回退旧版本。
+        // 前半段 happy path 已 insert 过一次，先清空调用记录再验 never，避免 Mockito 累计计数误判。
+        clearInvocations(recommendationMapper);
+        stubHappyPath("flashBee");
+        when(revisionMapper.selectOne(any())).thenReturn(null);
+        AdWaterfallRecommendationRequest missing = request(1, List.of());
+        missing.setAlgorithmRevisionId(null);
+        missing.setAlgorithmId(17L);
+        assertEquals(422, assertThrows(BusinessException.class,
+                () -> recommendationService.put(5L, missing)).getCode());
+        verify(recommendationMapper, never()).insert(any(AdWaterfallRecommendation.class));
     }
 
     @Test

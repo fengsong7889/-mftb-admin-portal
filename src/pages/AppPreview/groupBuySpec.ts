@@ -102,15 +102,25 @@ const MERCHANT_ACTION_SPECS: SpecEntry[] = [
   { id: 28, label: '查找相似', desc: '1、长按商家卡片，点击「查找相似」进入相似商家瀑布流；\n2、以当前商家的标签为锚点，匹配拥有相同标签的候选商家；\n3、候选按命中标签数降序排列，同分保持原瀑布流顺序，未命中相同标签的商家不展示；\n4、相似结果继续支持长按操作，返回后回到来源瀑布流。', source: '当前商家标签 + 候选商家标签匹配', changed: { date: '2026-11-24', text: '新增查找相似入口与标签匹配瀑布流。' } },
 ]
 
+/** 本輪查找相似口徑：僅優選商家/附近門店與美食外賣頻道頁使用，首頁外賣面板沿用原共用說明。 */
+const SIMILAR_MERCHANT_ACTION_SPEC: SpecEntry = {
+  id: 28,
+  label: '查找相似',
+  desc: '1、长按商家卡片，点击「查找相似」进入相似商家瀑布流；\n2、以当前商家的标签为锚点，匹配拥有标签与之有相似标签的候选商家；\n3、命中的商家会经过计算并排序返回给前端，具体规则后续参考后端相似推荐算法规则。',
+  source: '当前商家标签 + 后端相似推荐算法',
+  changed: { date: '2026-11-24', text: '新增查找相似入口与标签匹配瀑布流。' },
+}
+
 /** 團購券核銷是團購商家特有解除場景：僅優選商家/附近門店面板補充，外賣面板沿用共用口徑。 */
-const PREFERRED_MERCHANT_ACTION_SPECS: SpecEntry[] = MERCHANT_ACTION_SPECS.map((entry) =>
-  entry.id === 27
-    ? {
-        ...entry,
-        desc: entry.desc.replace('4.3、用户通过搜索进入商家详情并点击收藏后，解除。', '4.3、用户通过搜索进入商家详情并点击收藏，解除；\n4.4、用户购买的团购券去该商家进行核销，解除。'),
-      }
-    : entry,
-)
+const PREFERRED_MERCHANT_ACTION_SPECS: SpecEntry[] = MERCHANT_ACTION_SPECS.map((entry) => {
+  if (entry.id === 27) {
+    return {
+      ...entry,
+      desc: entry.desc.replace('4.3、用户通过搜索进入商家详情并点击收藏后，解除。', '4.3、用户通过搜索进入商家详情并点击收藏，解除；\n4.4、用户购买的团购券去该商家进行核销，解除。'),
+    }
+  }
+  return entry.id === 28 ? SIMILAR_MERCHANT_ACTION_SPEC : entry
+})
 
 export const DELIVERY_SPECS: SpecEntry[] = [
   { id: 18, label: '门店展示规则', desc: '以下场景触发任意一条，该门店不会在瀑布流展示：\n1、門店未上架；\n2、門店沒有簽約合同或合同未生效；\n3、非本品牌門店；\n4、未開通外賣業務且超市業務的輔營沒有選擇外賣的分類；\n5、當前定位，無自取、不在平臺配送範圍內、不在自送範圍內；\n6、未入駐門店；\n7、被標記為白名單門店，且當前用戶不是白名單用戶；\n8、用户设置为「不感兴趣」的门店，不会对当前用户展示；黑名单解除后恢复展示，搜索结果不受限制。', source: '待补充', note: '無在售商品（包括全部售罄）和不在營業時間，且不接受預定的商家，沉底显示；', deprecated: true, changed: { date: '2026-11-24', text: '新增第8点：不感兴趣门店对当前用户隐藏，解除后恢复展示，搜索结果不受限制。' }, history: [{ date: '2026-11-16', text: '删除了以下这句说明：' }] },
@@ -139,10 +149,11 @@ export const DELIVERY_SPECS: SpecEntry[] = [
   ...MERCHANT_ACTION_SPECS,
 ]
 
-/** 美食外卖页两面板专用：与首页外卖瀑布流共用 DELIVERY_SPECS 真源，仅「展示模式」行按频道页口径重写（无卡片模式，序号重排） */
-const DELIVERY_PAGE_SPECS: SpecEntry[] = DELIVERY_SPECS.map((s) =>
-  s.id === 21 ? { ...s, desc: deliveryModeDesc('deliveryPage') } : s,
-)
+/** 美食外卖页两面板专用：与首页外卖瀑布流共用 DELIVERY_SPECS 真源，仅重写展示模式与查找相似说明。 */
+const DELIVERY_PAGE_SPECS: SpecEntry[] = DELIVERY_SPECS.map((s) => {
+  if (s.id === 21) return { ...s, desc: deliveryModeDesc('deliveryPage') }
+  return s.id === 28 ? SIMILAR_MERCHANT_ACTION_SPEC : s
+})
 
 /* ══════════ 面板七：美食外卖页篩選（频道页单行筛选栏 + 多模块篩選 sheet，閃蜂/MFOOD 同构，2026-11 新增） ══════════
    筛选栏与 sheet 的 SpecField 锚点均挂在 DeliveryFilterBar；顶部排序/距離/配送说明已随入口下线。 */
@@ -227,10 +238,10 @@ export const SPEC_PANELS: SpecPanel[] = [
   { key: 'searchDelivery', group: '首页', label: '搜索结果瀑布流', defaults: [...DELIVERY_SEARCH_BASE_SPECS, ...SEARCH_DELIVERY_SPECS], version: 20, anchor: 'delivery', title: '首页 · 搜索结果·外卖瀑布流 · 展示字段及标签说明' },
   { key: 'searchGroup', group: '首页', label: '搜索结果·团购', hidden: true, tabAlias: 'searchDelivery', defaults: [...SEARCH_PREFERRED_SPECS, ...SEARCH_GROUP_SPECS], version: 13, anchor: 'preferred', title: '首页 · 搜索结果·团购瀑布流 · 展示字段及标签说明' },
   { key: 'groupPage', group: '特惠团购页', label: '推荐/其它', defaults: GROUPBUY_SPECS, version: 13, anchor: 'groupBuy' },
-  { key: 'preferred', group: '特惠团购页', label: '優選商家/附近門店', defaults: PREFERRED_SPECS, version: 44 },
+  { key: 'preferred', group: '特惠团购页', label: '優選商家/附近門店', defaults: PREFERRED_SPECS, version: 46 },
   { key: 'filter', group: '特惠团购页', label: '篩選', defaults: FILTER_SPECS, version: 15 },
   { key: 'searchGroupPage', group: '特惠团购页', label: '搜索结果瀑布流', defaults: [...SEARCH_PREFERRED_SPECS, ...SEARCH_GROUP_SPECS], version: 13, anchor: 'preferred' },
-  { key: 'deliveryPage', group: '美食外卖页', label: '美食外卖瀑布流', defaults: DELIVERY_PAGE_SPECS, version: 34, anchor: 'delivery', title: '美食外卖瀑布流·展示字段及标签说明' },
+  { key: 'deliveryPage', group: '美食外卖页', label: '美食外卖瀑布流', defaults: DELIVERY_PAGE_SPECS, version: 36, anchor: 'delivery', title: '美食外卖瀑布流·展示字段及标签说明' },
   { key: 'searchDeliveryPage', group: '美食外卖页', label: '搜索结果瀑布流', defaults: [...DELIVERY_PAGE_SPECS.filter((s) => s.id !== 27 && s.id !== 28), ...SEARCH_DELIVERY_SPECS], version: 20, anchor: 'delivery' },
   { key: 'deliveryFilter', group: '美食外卖页', label: '篩選', defaults: DELIVERY_FILTER_SPECS, version: 17 },
 ]

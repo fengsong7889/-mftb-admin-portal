@@ -126,8 +126,9 @@ export async function fetchLedger(start?: string, end?: string): Promise<LedgerR
   const groups = (dto.groups ?? []).map(g => ({ ...toGroup(g), virtual: isVirtualGroup(g.id) }))
   return {
     data: {
-      // 虚拟分组的标题留空，由界面按当前语言渲染「未分組記錄」，避免服务端回传中文
-      groups: groups.map(g => ({ id: g.id, title: g.title, hue: g.hue, tasks: g.tasks })),
+      // 虚拟分组的标题留空，由界面按当前语言渲染「未分組記錄」，避免服务端回传中文；
+      // virtual 标记必须透传到台账模型，否则界面会把只读容器当普通工作項给改名/删除入口
+      groups: groups.map(g => ({ id: g.id, title: g.title, hue: g.hue, tasks: g.tasks, virtual: g.virtual })),
       holidays: dto.holidays ?? [],
       makeup: dto.makeups ?? [],
       compOff: dto.compOffs ?? [],

@@ -101,6 +101,21 @@ describe('服务端参数契约', () => {
     expect(readSimilarParams({}, 'delivery').merchantMinimum).toBe(PROTOTYPE_DEFAULTS.merchantMinimum)
     expect(() => readSimilarParams('broken', 'delivery')).toThrow()
   })
+  it('召回/插入扩展键随参数下发并可回填；存量 v1 参数无键时回默认', () => {
+    const next: PrototypeValues = { ...values, modes: ['merchantSimilar', 'sameCategory'], slot2: 'sameCategory',
+      categoryLevel: 'tertiary', regionScope: 'tradeArea', timeSlotEnabled: false, timeSlotFill: 'any', insertStyle: 'slide', insertAnimMs: 720 }
+    const rules = serializeSimilarParams(next, 'delivery').similarRules as Record<string, unknown>
+    expect(rules).toMatchObject({ categoryMatchLevel: 'tertiary', regionScope: 'tradeArea', timeSlotPriority: false, timeSlotFill: 'any', insertStyle: 'slide', insertAnimMs: 720 })
+    const back = readSimilarParams(serializeSimilarParams(next, 'delivery'), 'delivery')
+    expect(back).toMatchObject({ categoryLevel: 'tertiary', regionScope: 'tradeArea', timeSlotEnabled: false, timeSlotFill: 'any', insertStyle: 'slide', insertAnimMs: 720 })
+    // 存量 v1：剔除扩展键后读取 → 回默认，不抛错不静默清空
+    const legacy = serializeSimilarParams(values, 'delivery')
+    const legacyRules = { ...(legacy.similarRules as Record<string, unknown>) }
+    for (const key of ['categoryMatchLevel', 'regionScope', 'timeSlotPriority', 'timeSlotFill', 'insertStyle', 'insertAnimMs']) delete legacyRules[key]
+    const legacyBack = readSimilarParams({ ...legacy, similarRules: legacyRules }, 'delivery')
+    expect(legacyBack).toMatchObject({ regionScope: PROTOTYPE_DEFAULTS.regionScope, timeSlotEnabled: PROTOTYPE_DEFAULTS.timeSlotEnabled,
+      timeSlotFill: PROTOTYPE_DEFAULTS.timeSlotFill, insertStyle: PROTOTYPE_DEFAULTS.insertStyle, insertAnimMs: PROTOTYPE_DEFAULTS.insertAnimMs })
+  })
 })
 
 describe('全局衰变单源', () => {

@@ -41,9 +41,16 @@ public final class AdSimilarAlgorithmParams {
     private static final Set<String> RULE_KEYS = Set.of("metric", "merchantSimilarityThreshold", "userSimilarityThreshold",
             "modes", "resultCount", "slot1Source", "slot2Source", "triggerMode", "dwellSeconds",
             "dailyLimitMode", "dailyLimit", "merchantFreqHours", "merchantFreqTimes",
-            "rankPreset", "rankFactors", "rankTieBreak");
+            "rankPreset", "rankFactors", "rankTieBreak",
+            // 2026-11-25 协议扩展：召回区域/时段优先、类目层级、插入动效进入白名单；
+            // 均为可选键（存量 v1 参数无这些键仍合法），出现则必须取值合法。
+            "categoryMatchLevel", "regionScope", "timeSlotPriority", "timeSlotFill", "insertStyle", "insertAnimMs");
     private static final Set<String> METRICS = Set.of("cosine", "weightedJaccard");
     private static final Set<String> MODES = Set.of("merchantSimilar", "userSimilar", "sameCategory");
+    private static final Set<String> CATEGORY_LEVELS = Set.of("primary", "secondary", "tertiary");
+    private static final Set<String> REGION_SCOPES = Set.of("delivery", "tradeArea");
+    private static final Set<String> TIME_SLOT_FILLS = Set.of("adjacent", "any");
+    private static final Set<String> INSERT_STYLES = Set.of("fade", "slide", "none");
     private static final Set<String> RANK_PRESETS = Set.of("matchFirst", "consumeFirst", "custom");
     /** 因子词表与前端投流 RANK_FACTOR_OPTIONS 同一词表（含匹配标签热度），相似引擎插入排序直接复用。 */
     private static final Set<String> RANK_FACTORS = Set.of("match", "quality", "distance", "traffic", "tagHeat");
@@ -127,6 +134,14 @@ public final class AdSimilarAlgorithmParams {
         } else if (factors != null && factors.isArray() && factors.size() != 0) throw invalid();
         String tieBreak = text(rules.get("rankTieBreak"), TIE_BREAKS);
         requireLiveTieBreak(preset, factorList, tieBreak);
+        // 可选扩展键：勾了同類目來源则类目层级必存在；其余出现即校值。
+        if (modeList.contains("sameCategory")) text(rules.get("categoryMatchLevel"), CATEGORY_LEVELS);
+        else optionalText(rules.get("categoryMatchLevel"), CATEGORY_LEVELS);
+        optionalText(rules.get("regionScope"), REGION_SCOPES);
+        optionalBoolean(rules.get("timeSlotPriority"));
+        optionalText(rules.get("timeSlotFill"), TIME_SLOT_FILLS);
+        optionalText(rules.get("insertStyle"), INSERT_STYLES);
+        if (rules.has("insertAnimMs")) integer(rules.get("insertAnimMs"), 120, 1200);
         if (metric == null) throw invalid();
         return copy;
     }
@@ -217,6 +232,15 @@ public final class AdSimilarAlgorithmParams {
     private static String text(JsonNode value, Set<String> allowed) {
         if (value == null || !value.isTextual() || !allowed.contains(value.asText())) throw invalid();
         return value.asText();
+    }
+
+    /** 可选文本键：缺省合法（存量 v1 参数无键），出现则必须取合法值。 */
+    private static String optionalText(JsonNode value, Set<String> allowed) {
+        return value == null ? null : text(value, allowed);
+    }
+
+    private static void optionalBoolean(JsonNode value) {
+        if (value != null && !value.isBoolean()) throw invalid();
     }
 
     public static BusinessException invalid() {

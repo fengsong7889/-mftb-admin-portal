@@ -235,7 +235,7 @@ const _OLD_KEY_TO_PATH_REMOVED = {
   'authorization-center': '/authorization-center',
   'function-permission': '/authorization-center',
   'data-permission': '/data-permission',
-  // 商家推广工具 - 词库管理
+  // 商家推广工具 - 算法推荐词库（menu_key 仍为 promotion-word-library，345 只改名不改键）
   'promotion-word-library': '/promotion-word-library',
   // 商家推广工具 - 流量沙盤
   'waterfall-simulation': '/waterfall-simulation',

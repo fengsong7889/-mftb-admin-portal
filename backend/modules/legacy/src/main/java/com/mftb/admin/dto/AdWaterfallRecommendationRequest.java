@@ -20,8 +20,10 @@ public class AdWaterfallRecommendationRequest {
     @NotNull(message = "場景不能為空")
     @Min(1) @Max(3)
     private Integer sceneCode;
-    /** 引用的不可变版本主键；仅停用既有绑定时可为空 */
+    /** 引用的不可变版本主键；传算法主键时可缺省，由服务端解析该算法最新已发布版本 */
     private Long algorithmRevisionId;
+    /** 绑定的算法实例主键（2026-11-25 绑定简化）：不再手选版本，服务端据此解析最新已发布版本 */
+    private Long algorithmId;
     @NotNull(message = "啟用狀態不能為空")
     @Min(0) @Max(1)
     private Integer enabled;

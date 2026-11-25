@@ -347,7 +347,7 @@ describe('投流配置交互与保存', () => {
     expect(scope).toBeDisabled()
     const scopeGroup = scope.closest('.traffic-field-group') as HTMLElement
     expect(scopeGroup).toHaveTextContent('仅投流商家')
-    expect(scopeGroup).toHaveTextContent('「全量商家」为预留档位')
+    expect(scopeGroup).toHaveTextContent('仅召回已购投流的商家')
     // 预设态因子行必须整体隐藏，且 hidden 落在外层裸 div：同一元素带 display:flex 类会盖掉 [hidden]。
     const factorsInline = screen.getByText('参与排序因子').closest('.traffic-fields-inline') as HTMLElement
     expect(factorsInline.parentElement?.hasAttribute('hidden')).toBe(true)
