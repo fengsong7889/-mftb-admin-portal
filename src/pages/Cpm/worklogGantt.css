@@ -605,6 +605,26 @@
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
+/* 纯历史视图提示：info 冷色弱层级横条——拖动前必读但不抢「目前最新」的主角位；
+   图标 flex:none 防长句换行时被挤扁 */
+.wg-prog-pop__history-tip {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 0;
+  padding: 6px 8px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-2);
+  background: color-mix(in srgb, var(--info) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--info) 22%, var(--border-2));
+  border-radius: 6px;
+}
+.wg-prog-pop__history-tip .anticon {
+  flex: none;
+  margin-top: 3px;
+  color: var(--info);
+}
 /* 「往期快照」只读历史上下文：冷色（info→purple）与「目前最新」的品牌橙拉开时态层级；
    左轨 + tinted 图标 + 迷你进度条让它一眼是「归档卡片」而不是可操作区。
    不带任何可提交控件，写明提交只会记录到今天。 */

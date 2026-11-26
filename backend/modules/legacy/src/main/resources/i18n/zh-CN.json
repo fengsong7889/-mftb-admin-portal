@@ -18529,6 +18529,7 @@
         "historyDelta": "较上期 {{value}}%",
         "historyNow": "当前已改至 {{value}}%，尚未保存为新一期记录",
         "historyTitle": "逐周进度",
+        "historyViewTip": "历史周期仅展示当时快照，进度条不随调整变化；最新进度已保存，切到「全部」或含今天的周期即可查看。",
         "noHistory": "尚无进度更新记录",
         "thisWeek": "本周",
         "week": "第 {{week}} 周",

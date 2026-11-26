@@ -5625,6 +5625,7 @@
 "cpm.gantt.progress.historyDelta",
 "cpm.gantt.progress.historyNow",
 "cpm.gantt.progress.historyTitle",
+"cpm.gantt.progress.historyViewTip",
 "cpm.gantt.progress.latest",
 "cpm.gantt.progress.live",
 "cpm.gantt.progress.noHistory",

@@ -296,6 +296,14 @@ export default function WorklogGantt() {
     const merged: GanttTask = { ...origin, ...patch }
     if (patch.progress !== undefined && patch.progress !== origin.progress) {
       merged.history = [...(origin.history ?? []), { at: fmt(dayjs()), progress: patch.progress }]
+      /* 视图含今天时期末快照就等于最新值（服务端 R 口径），本地快照必须跟着改：
+         列上色条读的是 periodProgress，不同步就会停在旧值，用户以为拖动没生效；
+         历史视图（区间整段早于今天）的期末是该期落定值，今天的调整不该覆写历史，不碰。 */
+      if (!isPastView) {
+        merged.periodProgress = patch.progress
+        merged.periodProgressKind = 'live'
+        merged.latestProgressAt = fmt(dayjs())
+      }
     }
     setData(d => ({
       ...d,
@@ -1412,6 +1420,9 @@ function viewTip(view: PeriodProgress, viewLabel: string, t: (k: string, o?: Rec
  *     并写明「提交只會記錄到今天」，避免把历史误当当前去覆盖。
  * <p>只在「最新一笔晚于被查看周期」时才出现快照卡：若最新记录就在被查看的那一周
  * （例如看本週且本週刚更新过），快照=当前值，重复出现只会与下方「本週」里程碑混淆。
+ * <p>区间整段早于今天的纯历史视图下另挂一条顶部提示：拖滑块保存的是今天的最新进度，
+ * 而视图里的进度条是历史落定快照、不会随之变化——不说这句，用户会把「保存成功但条不动」
+ * 当成缺陷；不锁滑块，是因为浏览历史时顺手记今天的进度是正当动作，锁定会逼人多切两步筛选。
  */
 function ProgressEditor({ task, view, viewLabel, viewEnd, onPatch }: {
   task: GanttTask
@@ -1426,12 +1437,20 @@ function ProgressEditor({ task, view, viewLabel, viewEnd, onPatch }: {
   // 不在前端重算快照值/回退种类
   const latestAt = task.latestProgressAt ?? (task.history ?? []).reduce<string | null>((m, h) => (m === null || h.at > m ? h.at : m), null)
   const showReview = viewEnd !== null && latestAt !== null && latestAt > viewEnd
+  // 期末落在今天之前 = 纯历史视图：调整不会改变本视图的进度条，拖动前先看见这句话
+  const historyView = viewEnd !== null && viewEnd < fmt(dayjs())
   return (
     <div className="wg-prog-pop">
       <div className="wg-prog-pop__live">
         <span>{t('cpm.gantt.progress.live', { defaultValue: '目前最新' })}</span>
         <b style={{ color: progressColor(current) }}>{current}%</b>
       </div>
+      {historyView && (
+        <p className="wg-prog-pop__history-tip">
+          <InfoCircleOutlined />
+          {t('cpm.gantt.progress.historyViewTip', { defaultValue: '歷史週期僅展示當時快照，進度條不隨調整變化；最新進度已保存，切到「全部」或含今天的週期即可查看。' })}
+        </p>
+      )}
       <Slider
         value={current}
         onChange={v => onPatch({ progress: v as number })}

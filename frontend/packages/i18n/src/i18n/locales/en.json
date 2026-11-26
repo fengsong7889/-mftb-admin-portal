@@ -18557,6 +18557,7 @@
         "historyDelta": "{{value}}% vs last week",
         "historyNow": "Now at {{value}}%, not yet saved as a new weekly record",
         "historyTitle": "Progress by week",
+        "historyViewTip": "Past periods show a snapshot only; the bar will not move with adjustments. Your latest progress is saved - switch to \"All\" or a period that includes today to see it.",
         "noHistory": "No progress updates yet",
         "thisWeek": "This week",
         "week": "Week {{week}}",
