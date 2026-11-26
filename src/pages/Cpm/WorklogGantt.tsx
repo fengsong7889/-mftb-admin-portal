@@ -12,7 +12,7 @@ import {
   AimOutlined, CalendarOutlined, CaretDownOutlined, CaretUpOutlined, CheckCircleOutlined, ClockCircleOutlined, DashboardOutlined,
   DeleteOutlined, DownloadOutlined, EditOutlined, FieldTimeOutlined, FileExcelOutlined, FileImageOutlined,
   FilePdfOutlined, HistoryOutlined, HolderOutlined, ImportOutlined, InfoCircleOutlined, LeftOutlined, MenuFoldOutlined, MenuUnfoldOutlined,
-  PlusOutlined, ReloadOutlined, RightOutlined, RobotOutlined, SearchOutlined, SyncOutlined, ThunderboltOutlined,
+  OrderedListOutlined, PlusOutlined, ReloadOutlined, RightOutlined, RobotOutlined, SearchOutlined, SyncOutlined, ThunderboltOutlined, UnorderedListOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import isoWeek from 'dayjs/plugin/isoWeek'
@@ -21,7 +21,7 @@ import { exportDocument, type DocumentExportKind } from '@/utils/documentExport'
 import {
   GROUP_COLORS, HOURS_CAP_PER_DAY, HOURS_PER_DAY, PROGRESS_BANDS, STORAGE_KEY, TASK_STATUS_META, buildRange, dayBadge,
   exportCsv, fmt, hoursCap, hoursInPeriod, mondayOf, overlaps, periodProgressOfTask, progressColor, shiftDate, shortDate,
-  splitHours, taskHours, taskStatus, weekName, weekdayShort, workdayCount,
+  splitHours, taskHours, taskRowH, taskStatus, weekName, weekdayShort, workdayCount,
   type DayCell, type GanttData, type GanttGroup, type GanttTask, type PeriodProgress, type TaskStatus,
 } from './worklogGanttModel'
 // API 函数统一加 api 前缀别名：本组件内部已有 deleteTask/deleteGroup 等同名局部函数，
@@ -1171,6 +1171,7 @@ function LeftRow({ group, task, data, hover, onHover, fresh, dropTarget, onDropT
   return (
     <div
       className={`wg-row${hover ? ' is-hover' : ''}${dropTarget ? ' wg-row--drop' : ''}`}
+      style={{ height: taskRowH(task.title) }}
       onMouseEnter={() => onHover(task.id)}
       onMouseLeave={() => onHover(null)}
       onDragOver={e => {
@@ -1727,6 +1728,7 @@ function RightRow({ group, task, data, days, colW, hover, onHover, drag, onDrag,
   return (
     <div
       className={`wg-rrow${hover ? ' is-hover' : ''}`}
+      style={{ height: taskRowH(task.title) }}
       onMouseEnter={() => onHover(task.id)}
       onMouseLeave={() => onHover(null)}
     >
@@ -1834,22 +1836,63 @@ function NoteEditorModal({ target, onClose, onSave }: {
   onSave: (html: string) => void
 }) {
   const { t } = useTranslation()
-  const ref = useRef<HTMLDivElement>(null)
-  useEffect(() => {
-    if (target && ref.current) {
-      ref.current.innerHTML = noteToDisplayHtml(target.note)
+  // 可空联合型：回调 ref 要往 current 写挂载结果，RefObject<HTMLDivElement> 的 current 是 readonly
+  const ref = useRef<HTMLDivElement | null>(null)
+  const [font, setFont] = useState('inherit')
+  /**
+   * 回填必须走回调 ref：destroyOnClose 下 Modal 的 portal 内容比 target 置位那次 commit
+   * 晚一个 tick 挂载，useEffect([target]) 跑时 ref.current 还是 null，回填被静默跳过——
+   * 编辑器空白、一保存就覆掉旧备注。回调 ref 在 DOM 节点挂载那一刻触发，时序有保证。
+   * <p>依赖必须锁在 [target]：内联回调（无依赖控制）每次重渲染都会被 React 重新 attach，
+   * pickFont 的 setFont 恰恰触发重渲染——innerHTML 重置会把刚打上的字体一同抹掉；
+   * useCallback([target]) 让重渲染时引用稳定，只有切换目标才重新回填。
+   */
+  const attachEditor = useCallback((el: HTMLDivElement | null) => {
+    ref.current = el
+    if (el && target) {
+      el.innerHTML = noteToDisplayHtml(target.note)
+      setFont('inherit')
       try { document.execCommand('styleWithCSS', false, 'true') } catch { /* 忽略 */ }
     }
   }, [target])
   // mousedown  preventDefault 保住編輯區選區，execCommand 才作用於選中文本
   const exec = (cmd: string, val?: string) => {
-    ref.current?.focus()
+    if (document.activeElement !== ref.current) ref.current?.focus()
     document.execCommand(cmd, false, val)
+  }
+  /** 块级切换：再点同一档回落正文，不会把人困在标题/引用里 */
+  const block = (tag: string) => {
+    const cur = (document.queryCommandValue('formatBlock') || '').toLowerCase()
+    exec('formatBlock', cur === tag ? '<p>' : `<${tag}>`)
+  }
+  // 字体下拉会夺走焦点：开下拉前存选区、选完恢复，fontName 才落在原文本上
+  const savedRange = useRef<Range | null>(null)
+  const rememberSelection = () => {
+    const sel = window.getSelection()
+    savedRange.current = sel && sel.rangeCount > 0 ? sel.getRangeAt(0).cloneRange() : null
+  }
+  const pickFont = (v: string) => {
+    setFont(v)
+    // 顺序必须是先 focus 再恢复选区：focus 会把光标落到编辑区默认位置，
+    // 若先 addRange 再 focus，选区被 focus 重置，fontName 只落在一个收起的光标上——
+    // 用户感知就是「切了字体但文字没变」
+    ref.current?.focus()
+    const sel = window.getSelection()
+    if (sel && savedRange.current) { sel.removeAllRanges(); sel.addRange(savedRange.current) }
+    exec('fontName', v)
   }
   const pickColor = (token: string) => {
     const c = getComputedStyle(document.documentElement).getPropertyValue(token).trim()
     exec('foreColor', c)
   }
+  const FONTS = [
+    ['inherit', t('cpm.gantt.note.fontDefault', { defaultValue: '默認字體' })],
+    ['Microsoft YaHei', t('cpm.gantt.note.fontYaHei', { defaultValue: '微軟雅黑' })],
+    ['PingFang SC', t('cpm.gantt.note.fontPingFang', { defaultValue: '蘋方' })],
+    ['SimHei', t('cpm.gantt.note.fontHei', { defaultValue: '黑體' })],
+    ['SimSun', t('cpm.gantt.note.fontSong', { defaultValue: '宋體' })],
+    ['KaiTi', t('cpm.gantt.note.fontKai', { defaultValue: '楷體' })],
+  ] as const
   return (
     <Modal
       open={!!target}
@@ -1887,10 +1930,28 @@ function NoteEditorModal({ target, onClose, onSave }: {
           <button key={v} type="button" title={t('cpm.gantt.note.sizeTip', { size: label, defaultValue: '字號・{{size}}' })} onMouseDown={e => e.preventDefault()} onClick={() => exec('fontSize', v)}>{label}</button>
         ))}
         <span className="wg-note-toolbar__sep" />
+        <Select
+          size="small"
+          className="wg-note-font"
+          value={font}
+          onDropdownVisibleChange={open => { if (open) rememberSelection() }}
+          onChange={pickFont}
+          options={FONTS.map(([v, label]) => ({ value: v, label }))}
+        />
+        <span className="wg-note-toolbar__sep" />
+        <button type="button" title={t('cpm.gantt.note.ol', { defaultValue: '有序列表' })} onMouseDown={e => e.preventDefault()} onClick={() => exec('insertOrderedList')}><OrderedListOutlined /></button>
+        <button type="button" title={t('cpm.gantt.note.ul', { defaultValue: '無序列表' })} onMouseDown={e => e.preventDefault()} onClick={() => exec('insertUnorderedList')}><UnorderedListOutlined /></button>
+        <span className="wg-note-toolbar__sep" />
+        <button type="button" title={t('cpm.gantt.note.h2', { defaultValue: '二級標題' })} onMouseDown={e => e.preventDefault()} onClick={() => block('h2')}>H2</button>
+        <button type="button" title={t('cpm.gantt.note.h3', { defaultValue: '三級標題' })} onMouseDown={e => e.preventDefault()} onClick={() => block('h3')}>H3</button>
+        <button type="button" title={t('cpm.gantt.note.quote', { defaultValue: '引用块' })} onMouseDown={e => e.preventDefault()} onClick={() => block('blockquote')}>{t('cpm.gantt.note.quoteShort', { defaultValue: '引用' })}</button>
+        <button type="button" title={t('cpm.gantt.note.hr', { defaultValue: '分割线' })} onMouseDown={e => e.preventDefault()} onClick={() => exec('insertHorizontalRule')}>─</button>
+        <button type="button" title={t('cpm.gantt.note.para', { defaultValue: '回落正文' })} onMouseDown={e => e.preventDefault()} onClick={() => exec('formatBlock', '<p>')}>{t('cpm.gantt.note.paraShort', { defaultValue: '正文' })}</button>
+        <span className="wg-note-toolbar__sep" />
         <button type="button" title={t('cpm.gantt.note.clearFormat', { defaultValue: '清除格式' })} onMouseDown={e => e.preventDefault()} onClick={() => exec('removeFormat')}>{t('cpm.gantt.note.clear', { defaultValue: '清除' })}</button>
       </div>
-      <div ref={ref} className="wg-note-editor" contentEditable suppressContentEditableWarning />
-      <p className="wg-note-tip">{t('cpm.gantt.note.tip', { defaultValue: '支持加粗／斜體／下劃線／字色／字號；保存時自動淨化。列表備註懸停即可閱讀全文，無需點擊。' })}</p>
+      <div ref={attachEditor} className="wg-note-editor" contentEditable suppressContentEditableWarning />
+      <p className="wg-note-tip">{t('cpm.gantt.note.tip', { defaultValue: '支持加粗／斜體／下劃線／字色／字號／字體／列表／標題／引用／分割線；保存時自動淨化。列表備註懸停即可閱讀全文，無需點擊。' })}</p>
     </Modal>
   )
 }

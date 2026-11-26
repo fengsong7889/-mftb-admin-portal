@@ -15,7 +15,7 @@
  * 白名單只放行排版標籤與有限 style 屬性，script/style/iframe 等連內容丟棄。
  */
 
-const ALLOWED_TAGS = new Set(['B', 'STRONG', 'I', 'EM', 'U', 'S', 'SPAN', 'BR', 'DIV', 'P', 'FONT'])
+const ALLOWED_TAGS = new Set(['B', 'STRONG', 'I', 'EM', 'U', 'S', 'SPAN', 'BR', 'DIV', 'P', 'FONT', 'OL', 'UL', 'LI', 'H2', 'H3', 'BLOCKQUOTE', 'HR'])
 const ALLOWED_STYLE = ['color', 'font-weight', 'font-size', 'font-style', 'text-decoration', 'font-family']
 const DROP_TAGS = new Set(['SCRIPT', 'STYLE', 'IFRAME', 'OBJECT', 'EMBED', 'LINK', 'META'])
 
@@ -36,13 +36,16 @@ export function sanitizeNoteHtml(html: string): string {
     const kids = Array.from(el.childNodes).map(ser).join('')
     if (!ALLOWED_TAGS.has(tag)) return kids
     if (tag === 'BR') return '<br>'
+    if (tag === 'HR') return '<hr>'
     const styles: string[] = []
     const rawStyle = el.getAttribute('style') || ''
     rawStyle.split(';').forEach(pair => {
       const idx = pair.indexOf(':')
       if (idx < 0) return
       const key = pair.slice(0, idx).trim().toLowerCase()
-      const val = pair.slice(idx + 1).trim()
+      // 值里的双引号必须剥：fontName 产出 font-family:"Microsoft YaHei"，
+      // 带引号回写进 style="…" 会把属性截断成非法 HTML（后端同口径）
+      const val = pair.slice(idx + 1).trim().replace(/"/g, '')
       if (ALLOWED_STYLE.includes(key) && val && !/url\(|expression|javascript:/i.test(val)) {
         styles.push(`${key}:${val}`)
       }
@@ -65,7 +68,8 @@ export function noteToText(note: string): string {
   if (typeof DOMParser === 'undefined') return note.replace(/<[^>]*>/g, '')
   const prepared = sanitizeNoteHtml(note)
     .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<\/(div|p)>/gi, '\n')
+    .replace(/<hr\s*\/?>/gi, '\n')
+    .replace(/<\/(div|p|li|h2|h3|blockquote)>/gi, '\n')
   const doc = new DOMParser().parseFromString(prepared, 'text/html')
   return (doc.body.textContent || '').replace(/\n{3,}/g, '\n\n').trim()
 }

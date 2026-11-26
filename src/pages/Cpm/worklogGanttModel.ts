@@ -52,6 +52,20 @@ export function periodProgressOfTask(t: GanttTask): PeriodProgress {
   return { value: t.periodProgress ?? t.progress, kind: t.periodProgressKind ?? 'live' }
 }
 
+/** 標題可用文字寬度：--wg-task(210) 减手柄/操作图标/内边距后的保守值 */
+const TASK_TITLE_W = 130
+/** 標題单行高（12px 字号 × 1.5 行距向上取整） */
+const TASK_TITLE_LINE_H = 18
+/**
+ * 標題换行后的行高：左侧 .wg-row 与右侧 .wg-rrow 必须用同一个数，
+ * 否则甘特色条与左側行会逐行错位。按全角字符保守估算（半角只会算多不会算少），
+ * 多出的留白无害，截断丢信息才是缺陷。
+ */
+export function taskRowH(title: string): number {
+  const lines = Math.max(1, Math.ceil((title?.length ?? 0) * 12 / TASK_TITLE_W))
+  return Math.max(44, lines * TASK_TITLE_LINE_H + 10)
+}
+
 export interface GanttTask {
   id: string
   title: string

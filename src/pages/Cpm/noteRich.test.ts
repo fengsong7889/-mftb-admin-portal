@@ -47,6 +47,21 @@ describe('sanitizeNoteHtml 白名单', () => {
     expect(sanitizeNoteHtml('a &lt; b &amp; c')).toBe('a &lt; b &amp; c')
     expect(sanitizeNoteHtml('')).toBe('')
   })
+
+  it('列表/标题/引用/分割线放行，hr 为自闭合不带闭标签', () => {
+    expect(sanitizeNoteHtml('<ol><li>一</li><li>二</li></ol>')).toBe('<ol><li>一</li><li>二</li></ol>')
+    expect(sanitizeNoteHtml('<ul><li>甲</li></ul>')).toBe('<ul><li>甲</li></ul>')
+    expect(sanitizeNoteHtml('<h2>標題</h2><h3>小標</h3>')).toBe('<h2>標題</h2><h3>小標</h3>')
+    expect(sanitizeNoteHtml('<blockquote>引文</blockquote>')).toBe('<blockquote>引文</blockquote>')
+    expect(sanitizeNoteHtml('上<hr>下')).toBe('上<hr>下')
+    // h1 不在白名单：只允许 H2/H3 两级，避免备注里出现文档级大标题
+    expect(sanitizeNoteHtml('<h1>大標</h1>')).toBe('大標')
+  })
+
+  it('font-family 值里的双引号被剥，回写 style 属性不会截断', () => {
+    expect(sanitizeNoteHtml('<span style="font-family:&quot;Microsoft YaHei&quot;">字</span>'))
+      .toBe('<span style="font-family:Microsoft YaHei">字</span>')
+  })
 })
 
 describe('noteToText 纯文本降级', () => {
@@ -66,6 +81,13 @@ describe('noteToText 纯文本降级', () => {
     const text = noteToText('<div>a</div><div></div><div></div><div></div><div>b</div>')
     expect(text).toBe('a\n\nb')
     expect(/\n{3,}/.test(text)).toBe(false)
+  })
+
+  it('列表/标题/引用/分割线降级为换行，导出文本与页面读到的行一致', () => {
+    expect(noteToText('<ol><li>一</li><li>二</li></ol>')).toBe('一\n二')
+    expect(noteToText('<h2>標題</h2><p>正文</p>')).toBe('標題\n正文')
+    expect(noteToText('<blockquote>引文</blockquote>')).toBe('引文')
+    expect(noteToText('上<hr>下')).toBe('上\n下')
   })
 })
 

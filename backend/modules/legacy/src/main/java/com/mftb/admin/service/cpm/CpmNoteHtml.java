@@ -27,7 +27,8 @@ public final class CpmNoteHtml {
 
     /** 与前端 noteRich.ts 的白名单逐字一致：两处不同就会有一个出口把另一种的漏网标签渲染出来 */
     private static final Set<String> ALLOWED = Set.of(
-            "b", "strong", "i", "em", "u", "s", "span", "br", "div", "p", "font");
+            "b", "strong", "i", "em", "u", "s", "span", "br", "div", "p", "font",
+            "ol", "ul", "li", "h2", "h3", "blockquote", "hr");
     private static final Set<String> DROP_WITH_CONTENT = Set.of(
             "script", "style", "iframe", "object", "embed", "link", "meta");
     private static final Set<String> ALLOWED_STYLE = Set.of(
@@ -73,7 +74,7 @@ public final class CpmNoteHtml {
                 if (DROP_WITH_CONTENT.contains(name)) {
                     continue;
                 }
-                if (ALLOWED.contains(name) && !name.equals("br")) {
+                if (ALLOWED.contains(name) && !name.equals("br") && !name.equals("hr")) {
                     // 闭合标签必须与开标签同名降级，否则 <font>…</font> 会变成 <span>…</font>，
                     // 浏览器把多余的 </font> 当噪声吞掉，但 Markdown/Word 导出会留下脏标签
                     out.append("</").append(name.equals("font") ? "span" : name).append('>');
@@ -92,6 +93,10 @@ public final class CpmNoteHtml {
             }
             if (name.equals("br")) {
                 out.append("<br>");
+                continue;
+            }
+            if (name.equals("hr")) {
+                out.append("<hr>");
                 continue;
             }
             String style = allowedStyle(raw);
@@ -122,7 +127,8 @@ public final class CpmNoteHtml {
         }
         String text = sanitize(html)
                 .replaceAll("(?i)<br\\s*/?>", "\n")
-                .replaceAll("(?i)</(div|p)>", "\n")
+                .replaceAll("(?i)<hr\\s*/?>", "\n")
+                .replaceAll("(?i)</(div|p|li|h2|h3|blockquote)>", "\n")
                 .replaceAll("<[^>]*>", "");
         text = unescape(text);
         return text.replaceAll("\n{3,}", "\n\n").trim();
@@ -149,6 +155,9 @@ public final class CpmNoteHtml {
         if (value == null || value.isBlank()) {
             return "";
         }
+        // 先解码 &quot; 再按 ; 切：实体里的分号会先把 font-family:"…" 的值切断
+        // （前端 DOMParser 取属性时已解码，两处必须同序）
+        value = value.replace("&quot;", "\"");
         List<String> kept = new ArrayList<>();
         for (String pair : value.split(";")) {
             int idx = pair.indexOf(':');
@@ -156,7 +165,9 @@ public final class CpmNoteHtml {
                 continue;
             }
             String key = pair.substring(0, idx).trim().toLowerCase();
-            String val = pair.substring(idx + 1).trim();
+            // 值里的双引号必须剥：fontName 产出 font-family:"Microsoft YaHei"，
+            // 带引号回写进 style="…" 会把属性截断成非法 HTML（前端 noteRich.ts 同口径）
+            String val = pair.substring(idx + 1).trim().replace("\"", "");
             if (ALLOWED_STYLE.contains(key) && !val.isEmpty()
                     && !val.matches("(?i).*(url\\(|expression|javascript:|@).*")) {
                 kept.add(key + ":" + val);

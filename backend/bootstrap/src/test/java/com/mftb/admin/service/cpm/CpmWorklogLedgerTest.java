@@ -145,6 +145,16 @@ class CpmWorklogLedgerTest {
                 .isEqualTo("<span>文字</span>");
         assertThat(CpmNoteHtml.sanitize("<font color=\"#00f\">藍</font>")).isEqualTo("<span style=\"color:#00f\">藍</span>");
         assertThat(CpmNoteHtml.sanitize("<img src=\"x\" onerror=\"alert(1)\">")).isEmpty();
+        // 列表/标题/引用/分割线与前端 noteRich.ts 白名单同形；hr 自闭合不带闭标签
+        assertThat(CpmNoteHtml.sanitize("<ol><li>一</li><li>二</li></ol>")).isEqualTo("<ol><li>一</li><li>二</li></ol>");
+        assertThat(CpmNoteHtml.sanitize("<ul><li>甲</li></ul>")).isEqualTo("<ul><li>甲</li></ul>");
+        assertThat(CpmNoteHtml.sanitize("<h2>標題</h2><h3>小標</h3>")).isEqualTo("<h2>標題</h2><h3>小標</h3>");
+        assertThat(CpmNoteHtml.sanitize("<blockquote>引文</blockquote>")).isEqualTo("<blockquote>引文</blockquote>");
+        assertThat(CpmNoteHtml.sanitize("上<hr>下")).isEqualTo("上<hr>下");
+        assertThat(CpmNoteHtml.sanitize("<h1>大標</h1>")).isEqualTo("大標");
+        // fontName 产出的带引号 font-family（含 &quot; 实体形态）剥引号后回写，不截断 style 属性
+        assertThat(CpmNoteHtml.sanitize("<span style=\"font-family:&quot;Microsoft YaHei&quot;\">字</span>"))
+                .isEqualTo("<span style=\"font-family:Microsoft YaHei\">字</span>");
     }
 
     @Test
@@ -155,6 +165,9 @@ class CpmWorklogLedgerTest {
         assertThat(CpmNoteHtml.toPlainText("第一行<br>第二行")).isEqualTo("第一行\n第二行");
         assertThat(CpmNoteHtml.toPlainText("<b>加粗</b>與<span style=\"color:red\">紅色</span>")).isEqualTo("加粗與紅色");
         assertThat(CpmNoteHtml.toPlainText("<script>alert(1)</script>安全")).isEqualTo("安全");
+        assertThat(CpmNoteHtml.toPlainText("<ol><li>一</li><li>二</li></ol>")).isEqualTo("一\n二");
+        assertThat(CpmNoteHtml.toPlainText("<h2>標題</h2><p>正文</p>")).isEqualTo("標題\n正文");
+        assertThat(CpmNoteHtml.toPlainText("上<hr>下")).isEqualTo("上\n下");
     }
 
     @Test

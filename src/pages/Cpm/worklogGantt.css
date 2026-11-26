@@ -916,9 +916,11 @@
   flex: 1;
   min-width: 0;
   color: var(--text-1);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  /* 任务子项是重要信息：不截断不省略，整段换行全量展示；
+     行高由 taskRowH 同步给左右两侧，不会错位 */
+  white-space: normal;
+  word-break: break-all;
+  line-height: 1.5;
 }
 .wg-task__title--done {
   color: var(--text-3);
@@ -1103,19 +1105,28 @@
   max-width: 380px;
   max-height: 280px;
   overflow: auto;
-  font-size: 12px;
-  line-height: 1.6;
+  /* 与 .wg-note-editor 同一套排版：悬停看到的就是编辑时看到的，
+     不能一处 12px/1.6 无底一处 13px/1.7 白底描边 */
+  font-size: 13px;
+  line-height: 1.7;
   color: var(--text-1);
+  padding: 10px 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-2);
+  border-radius: 6px;
   scrollbar-width: thin;
 }
 .wg-note-preview {
   max-height: 96px;
   overflow: auto;
-  font-size: 12px;
-  line-height: 1.6;
-  color: var(--text-2);
-  padding: 6px 8px;
-  background: var(--surface-3);
+  /* 与 .wg-note-editor 同一套排版（13px/1.7/text-1/surface-2+描边）：
+     悬停看到的就是编辑时看到的，不能一处 12px 灰字一处 13px 白底 */
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--text-1);
+  padding: 10px 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-2);
   border-radius: 6px;
 }
 .wg-note-empty {
@@ -1180,6 +1191,56 @@
 .wg-note-editor:focus {
   border-color: var(--brand);
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand) 18%, transparent);
+}
+/* 字体下拉：工具栏内紧凑宽度，不抢按钮位 */
+.wg-note-font {
+  width: 108px;
+}
+/* 编辑区与展示区共用的块级排版：列表/标题/引用/分割线在白名单放行后必须有可读样式，
+   否则 ol/ul 失去缩进、blockquote 与普通段落无异，用户以为格式没生效 */
+.wg-note-editor ol,
+.wg-note-editor ul,
+.wg-note-preview ol,
+.wg-note-preview ul,
+.wg-note-hover ol,
+.wg-note-hover ul {
+  margin: 4px 0;
+  padding-left: 22px;
+}
+.wg-note-editor li,
+.wg-note-preview li,
+.wg-note-hover li {
+  margin: 2px 0;
+}
+.wg-note-editor h2,
+.wg-note-preview h2,
+.wg-note-hover h2 {
+  margin: 6px 0 4px;
+  font-size: 16px;
+  font-weight: 700;
+}
+.wg-note-editor h3,
+.wg-note-preview h3,
+.wg-note-hover h3 {
+  margin: 5px 0 3px;
+  font-size: 14px;
+  font-weight: 700;
+}
+.wg-note-editor blockquote,
+.wg-note-preview blockquote,
+.wg-note-hover blockquote {
+  margin: 6px 0;
+  padding: 4px 10px;
+  border-left: 3px solid var(--brand);
+  background: var(--surface-3);
+  color: var(--text-2);
+}
+.wg-note-editor hr,
+.wg-note-preview hr,
+.wg-note-hover hr {
+  margin: 8px 0;
+  border: none;
+  border-top: 1px solid var(--border-2);
 }
 .wg-note-tip {
   margin: 8px 0 0;
