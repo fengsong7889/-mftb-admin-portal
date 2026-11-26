@@ -5,23 +5,24 @@
  * 未经著作权人书面许可，不得使用、复制、修改、再分发或用于任何商业目的。
  * 完整许可条款见仓库根目录 LICENSE 文件。
  */
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as RPointerEvent, type RefObject } from 'react'
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as RPointerEvent, type RefObject } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Alert, Button, DatePicker, Dropdown, Form, Input, InputNumber, Modal, Popover, Segmented, Select, Slider, Switch, Tag, Tooltip, message, type MenuProps } from 'antd'
 import {
-  AimOutlined, CalendarOutlined, CaretDownOutlined, CaretUpOutlined, CheckCircleOutlined, ClockCircleOutlined, DashboardOutlined,
+  AimOutlined, CalendarOutlined, CaretDownOutlined, CaretUpOutlined, CheckCircleOutlined, ClockCircleOutlined, CloseCircleOutlined, DashboardOutlined,
   DeleteOutlined, DownloadOutlined, EditOutlined, FieldTimeOutlined, FileExcelOutlined, FileImageOutlined,
-  FilePdfOutlined, HistoryOutlined, HolderOutlined, ImportOutlined, InfoCircleOutlined, LeftOutlined, MenuFoldOutlined, MenuUnfoldOutlined,
-  OrderedListOutlined, PlusOutlined, ReloadOutlined, RightOutlined, RobotOutlined, SearchOutlined, SyncOutlined, ThunderboltOutlined, UnorderedListOutlined,
+  FilePdfOutlined, FlagOutlined, HistoryOutlined, HolderOutlined, ImportOutlined, InfoCircleOutlined, LeftOutlined, MenuFoldOutlined, MenuUnfoldOutlined,
+  OrderedListOutlined, PlusOutlined, ReloadOutlined, RightOutlined, RobotOutlined, RollbackOutlined, SearchOutlined, StopOutlined, SyncOutlined, ThunderboltOutlined, UnorderedListOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import isoWeek from 'dayjs/plugin/isoWeek'
 import AnimatedNumber from '@/components/AnimatedNumber'
+import HelpPopover from '@/components/HelpPopover'
 import { exportDocument, type DocumentExportKind } from '@/utils/documentExport'
 import {
-  GROUP_COLORS, HOURS_CAP_PER_DAY, HOURS_PER_DAY, PROGRESS_BANDS, STORAGE_KEY, TASK_STATUS_META, buildRange, dayBadge,
-  exportCsv, fmt, hoursCap, hoursInPeriod, mondayOf, overlaps, periodProgressOfTask, progressColor, shiftDate, shortDate,
-  splitHours, taskHours, taskRowH, taskStatus, weekName, weekdayShort, workdayCount,
+  GROUP_COLORS, HOURS_CAP_PER_DAY, HOURS_PER_DAY, PROGRESS_BANDS, STALL_DAYS, STORAGE_KEY, TASK_STATUS_META, buildRange, crossesWeek, dayBadge,
+  exportCsv, fmt, hoursCap, hoursInPeriod, mondayOf, overlaps, overdueDaysOf, periodProgressOfTask, progressColor, shiftDate, shortDate,
+  splitHours, stalledDaysOf, taskHours, taskRowH, taskStatus, weekName, weekdayShort, workdayCount,
   type DayCell, type GanttData, type GanttGroup, type GanttTask, type PeriodProgress, type TaskStatus,
 } from './worklogGanttModel'
 // API 函数统一加 api 前缀别名：本组件内部已有 deleteTask/deleteGroup 等同名局部函数，
@@ -29,7 +30,7 @@ import {
 import {
   createGroup as apiCreateGroup, createTask as apiCreateTask, deleteGroup as apiDeleteGroup,
   deleteTask as apiDeleteTask, fetchLedger, importLocalLedger, isVirtualGroup, reorderGroups as apiReorderGroups,
-  restoreGroup as apiRestoreGroup, restoreTask as apiRestoreTask, toImportPayload,
+  restoreGroup as apiRestoreGroup, restoreTask as apiRestoreTask, restoreTaskState as apiRestoreState, toImportPayload,
   updateGroup as apiUpdateGroup, updateTask as apiUpdateTask,
 } from './worklogApi'
 import { doneAtOf } from './worklogReport'
@@ -52,8 +53,8 @@ dayjs.extend(isoWeek)
  * 导出复用共享层 documentExport：长图 PNG / A4 分页 PDF，另保留 CSV。
  */
 
-/** 与 worklogGantt.css 左栏宽度变量总和保持一致（自动滚动边界兜底用） */
-const LEFT_W = 1088
+/** 与 worklogGantt.css 左栏宽度变量总和保持一致（自动滚动边界兜底用）：148+240+116+116+88+128+84+208+124 */
+const LEFT_W = 1252
 
 interface DragState {
   groupId: string
@@ -62,6 +63,28 @@ interface DragState {
   delta: number
   originStart: string
   originEnd: string
+}
+
+interface TaskRenderMeta {
+  task: GanttTask
+  rowH: number
+  offsetInGroup: number
+  markRow: boolean
+  signalRow: boolean
+  hours: number
+  workdays: number
+  overtime: number
+  view: PeriodProgress
+  color: string
+}
+
+interface GroupRenderMeta {
+  group: GanttGroup
+  rows: TaskRenderMeta[]
+  top: number
+  startRow: number
+  endRow: number
+  height: number
 }
 
 /** 台账空值：服务端未返回前不给任何假数据（同域铁律：后端不可用就如实报错，不回退示例） */
@@ -80,6 +103,12 @@ const LEDGER_TEMPLATE_KEY = 'general'
  */
 const HOURS_CHIPS = [1, 2, 4, 8, 16, 24, 40]
 
+/** 上百条时启用行级虚拟化；小数据保留自然流，避免为少量行引入绝对定位回归面。 */
+const VIRTUAL_ROW_THRESHOLD = 60
+const VIRTUAL_OVERSCAN_PX = 180
+const ADD_ROW_H = 36
+const END_CAP_H = 48
+
 export default function WorklogGantt() {
   const { t } = useTranslation()
   const [data, setData] = useState<GanttData>(EMPTY_LEDGER)
@@ -92,7 +121,7 @@ export default function WorklogGantt() {
   const [keywordDraft, setKeywordDraft] = useState('')
   const [keyword, setKeyword] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | TaskStatus>('all')
-  const [planFilter, setPlanFilter] = useState<'all' | 'planned' | 'inserted'>('all')
+  const [planFilter, setPlanFilter] = useState<'all' | 'planned' | 'inserted' | 'follow'>('all')
   const [groupFilter, setGroupFilter] = useState<string>('all')
   const [showWeekends, setShowWeekends] = useState(true)
   const [colW, setColW] = useState(34)
@@ -108,7 +137,13 @@ export default function WorklogGantt() {
   const [dropId, setDropId] = useState<string | null>(null)
   const [freshId, setFreshId] = useState<string | null>(null)
   const [exportBusy, setExportBusy] = useState<DocumentExportKind | 'csv' | null>(null)
+  const [exportRenderAll, setExportRenderAll] = useState(false)
+  const [scrollMetrics, setScrollMetrics] = useState({ top: 0, height: 0 })
   const [noteTarget, setNoteTarget] = useState<{ gid: string; tid: string; title: string; note: string } | null>(null)
+  /** 阻塞/取消的原因弹层：两种标记都必填原因，共用一个面板按 kind 区分文案 */
+  const [markTarget, setMarkTarget] = useState<{ kind: 'block' | 'cancel'; gid: string; task: GanttTask } | null>(null)
+  const [markReason, setMarkReason] = useState('')
+  const [markError, setMarkError] = useState<string | null>(null)
   /**
    * 日视图并入的三个面板开关。互斥不强制：AI 助手与导入面板面向不同的事，
    * 但同一时刻只会从功能区点一个，不在这里多花一层状态去管它。
@@ -217,7 +252,9 @@ export default function WorklogGantt() {
         const groupHit = kw !== '' && g.title.toLowerCase().includes(kw)
         const tasks = g.tasks.filter(t => {
           if (statusFilter !== 'all' && taskStatus(t) !== statusFilter) return false
-          if (planFilter !== 'all' && (t.planType ?? 'planned') !== planFilter) return false
+          // 跟進是與 planType 正交的獨立維度：同一條任務可同時命中「臨時」與「跟進」兩檔，
+          // 各檔按當前所選精確過濾、命中即顯示（口徑已寫進計劃屬性的 HelpPopover）
+          if (planFilter === 'follow') { if (!t.followUp) return false } else if (planFilter !== 'all' && (t.planType ?? 'planned') !== planFilter) return false
           if (rangeStartStr && rangeEndStr) {
             // 時間篩選只作用於已排期任務；未排期在「全部」檔可見
             if (!overlaps(t, rangeStartStr, rangeEndStr)) return false
@@ -254,6 +291,7 @@ export default function WorklogGantt() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filteredGroups, data, rangeStartStr, rangeEndStr])
   const filterKey = `${keyword}|${statusFilter}|${planFilter}|${groupFilter}|${timePreset}|${rangeStartStr}|${rangeEndStr}`
+  const totalTaskCount = useMemo(() => filteredGroups.reduce((sum, g) => sum + g.tasks.length, 0), [filteredGroups])
 
   /* ---------- 读取：服务端台账是唯一真源 ---------- */
   const reload = useCallback(async () => {
@@ -285,31 +323,45 @@ export default function WorklogGantt() {
   }, [])
 
   /* ---------- 变更：本地先行（拖动/输入要跟手），服务端落定后刷新 ---------- */
+  const dataRef = useRef(data)
+  const reloadRef = useRef(reload)
+  useEffect(() => { dataRef.current = data }, [data])
+  useEffect(() => { reloadRef.current = reload }, [reload])
+
   const syncError = useCallback((e: unknown) => {
     message.error(e instanceof Error ? e.message : t('cpm.gantt.msg.syncFailed', { defaultValue: '保存失敗，請重試' }))
-    void reload()
-  }, [reload, t])
+    void reloadRef.current()
+  }, [t])
 
-  const patchTask = (gid: string, tid: string, patch: Partial<GanttTask>) => {
-    const origin = data.groups.find(g => g.id === gid)?.tasks.find(t => t.id === tid)
-    if (!origin) return
+  const applyTaskPatch = useCallback((gid: string, tid: string, patch: Partial<GanttTask>, commit: boolean) => {
+    const origin = dataRef.current.groups.find(g => g.id === gid)?.tasks.find(t => t.id === tid)
+    if (!origin) return null
     const merged: GanttTask = { ...origin, ...patch }
-    if (patch.progress !== undefined && patch.progress !== origin.progress) {
-      merged.history = [...(origin.history ?? []), { at: fmt(dayjs()), progress: patch.progress }]
+    if (patch.progress !== undefined) {
+      /* 预览只负责跟手，不提前写流水；释放/确认时才落一笔，避免一次拖动造出十几条进度记录。 */
+      if (!commit) {
+        merged.progress = origin.progress
+      } else if (patch.progress !== origin.progress) {
+        merged.history = [...(origin.history ?? []), { at: fmt(dayjs()), progress: patch.progress }]
+      }
       /* 视图含今天时期末快照就等于最新值（服务端 R 口径），本地快照必须跟着改：
          列上色条读的是 periodProgress，不同步就会停在旧值，用户以为拖动没生效；
          历史视图（区间整段早于今天）的期末是该期落定值，今天的调整不该覆写历史，不碰。 */
-      if (!isPastView) {
+      if (!isPastView && (commit || patch.progress !== origin.progress)) {
         merged.periodProgress = patch.progress
         merged.periodProgressKind = 'live'
-        merged.latestProgressAt = fmt(dayjs())
+        if (commit) merged.latestProgressAt = fmt(dayjs())
       }
     }
     setData(d => ({
       ...d,
       groups: d.groups.map(g => g.id !== gid ? g : { ...g, tasks: g.tasks.map(t => t.id === tid ? merged : t) }),
     }))
-    void apiUpdateTask(Number(tid), {
+    return merged
+  }, [isPastView])
+
+  const persistTask = useCallback((gid: string, merged: GanttTask, patch?: Partial<GanttTask>) => {
+    void apiUpdateTask(Number(merged.id), {
       groupId: Number(gid),
       title: merged.title,
       start: merged.start,
@@ -318,20 +370,35 @@ export default function WorklogGantt() {
       note: merged.note,
       planType: merged.planType ?? 'planned',
       insertedAt: merged.insertedAt ?? null,
+      followUp: merged.followUp,
+      blocked: merged.blocked,
+      blockedReason: merged.blockedReason ?? null,
+      cancelled: merged.cancelled,
+      cancelReason: merged.cancelReason ?? null,
       // 耗时只在真的动过时才提交：undefined=不改动，null=显式清除并回落到工作日口径
-      hours: 'hoursOverride' in patch ? patch.hoursOverride ?? null : undefined,
-      hoursCleared: 'hoursOverride' in patch && patch.hoursOverride == null,
+      hours: patch && 'hoursOverride' in patch ? patch.hoursOverride ?? null : undefined,
+      hoursCleared: !!patch && 'hoursOverride' in patch && patch.hoursOverride == null,
     }).catch(syncError)
-  }
-  const patchGroup = (gid: string, patch: Partial<GanttGroup>) => {
-    const origin = data.groups.find(g => g.id === gid)
+  }, [syncError])
+
+  const patchTask = useCallback((gid: string, tid: string, patch: Partial<GanttTask>) => {
+    const merged = applyTaskPatch(gid, tid, patch, true)
+    if (merged) persistTask(gid, merged, patch)
+  }, [applyTaskPatch, persistTask])
+
+  const previewTask = useCallback((gid: string, tid: string, patch: Partial<GanttTask>) => {
+    applyTaskPatch(gid, tid, patch, false)
+  }, [applyTaskPatch])
+
+  const patchGroup = useCallback((gid: string, patch: Partial<GanttGroup>) => {
+    const origin = dataRef.current.groups.find(g => g.id === gid)
     if (!origin) return
     setData(d => ({ ...d, groups: d.groups.map(g => g.id !== gid ? g : { ...g, ...patch }) }))
     // 虚拟分组（id=0）服务端没有对应行：改名落到它头上只会换来一句「工作項不存在」，界面层先拦住
     if (patch.title !== undefined && !isVirtualGroup(Number(gid))) {
       void apiUpdateGroup(Number(gid), { title: patch.title, hue: origin.hue }).catch(syncError)
     }
-  }
+  }, [syncError])
   /**
    * 未排期的行在週期檔永遠不可見：時間篩選只作用於已排期任務，未排期在「全部」檔可見。
    * <p>在週期檔下新增子任務/工作項，新行必然未排期，點下去就是「沒反應」——
@@ -433,15 +500,99 @@ export default function WorklogGantt() {
   }
 
   /* 臨時插入標記：顯式人工標記、雙向可逆；insertedAt 預設今天 */
-  const toggleInserted = (gid: string, task: GanttTask) => {
+  const toggleInserted = useCallback((gid: string, task: GanttTask) => {
     const inserted = task.planType === 'inserted'
     patchTask(gid, task.id, inserted ? { planType: 'planned', insertedAt: null } : { planType: 'inserted', insertedAt: fmt(dayjs()) })
     message.success(inserted
       ? t('cpm.gantt.msg.planRestored', { defaultValue: '已恢復為原計劃' })
       : t('cpm.gantt.msg.insertedMarked', { date: fmt(dayjs()), defaultValue: '已標記臨時插入（{{date}}）' }))
+  }, [patchTask, t])
+  /* 跟進工作標記：與 planType 正交的獨立維度（可「臨時+跟進」並存），雙向可逆 */
+  const toggleFollowUp = useCallback((gid: string, task: GanttTask) => {
+    const next = !task.followUp
+    patchTask(gid, task.id, { followUp: next })
+    message.success(next
+      ? t('cpm.gantt.msg.followMarked', { defaultValue: '已標記為跟進工作' })
+      : t('cpm.gantt.msg.followCleared', { defaultValue: '已取消跟進標記' }))
+  }, [patchTask, t])
+  /**
+   * 阻塞：原因必填的獨立標記維度——不佔用 status（statusOf 每次更新按進度重算會沖掉它），
+   * 阻塞期間進度/備註/排期照常可編輯；解除不需原因但要二次確認，恢復由進度推导。
+   */
+  const toggleBlock = useCallback((gid: string, task: GanttTask) => {
+    if (task.blocked) {
+      Modal.confirm({
+        title: t('cpm.gantt.block.unmarkTitle', { defaultValue: '確定解除阻塞？' }),
+        className: 'custom-confirm-modal',
+        icon: <span className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></span>,
+        content: (
+          <div className="confirm-info-card">
+            <div className="confirm-info-row"><span>{t('cpm.gantt.confirm.labelTask', { defaultValue: '子任務：' })}</span><b>{task.title}</b></div>
+            <div className="confirm-info-row"><span>{t('cpm.gantt.block.reasonLabel', { defaultValue: '阻塞原因：' })}</span><b>{task.blockedReason ?? ''}</b></div>
+          </div>
+        ),
+        okText: t('cpm.gantt.block.unmarkOk', { defaultValue: '解除阻塞' }),
+        cancelText: t('common.cancel', { defaultValue: '取消' }),
+        onOk: () => {
+          patchTask(gid, task.id, { blocked: false, blockedReason: null })
+          message.success(t('cpm.gantt.msg.blockCleared', { defaultValue: '已解除阻塞，任務狀態按進度恢復' }))
+        },
+      })
+      return
+    }
+    setMarkTarget({ kind: 'block', gid, task })
+    setMarkReason(task.blockedReason ?? '')
+    setMarkError(null)
+  }, [patchTask, t])
+  /** 取消：必填原因；落定後編輯全凍結，僅保留刪除與恢復兩個入口 */
+  const toggleCancel = useCallback((gid: string, task: GanttTask) => {
+    setMarkTarget({ kind: 'cancel', gid, task })
+    setMarkReason(task.cancelReason ?? '')
+    setMarkError(null)
+  }, [])
+  const restoreCancelled = useCallback((gid: string, task: GanttTask) => {
+    Modal.confirm({
+      title: t('cpm.gantt.cancel.restoreTitle', { defaultValue: '恢復為可編輯狀態？' }),
+      className: 'custom-confirm-modal',
+      icon: <span className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></span>,
+      content: (
+        <div className="confirm-info-card">
+          <div className="confirm-info-row"><span>{t('cpm.gantt.confirm.labelTask', { defaultValue: '子任務：' })}</span><b>{task.title}</b></div>
+          <div className="confirm-info-row"><span>{t('cpm.gantt.cancel.reasonLabel', { defaultValue: '取消原因：' })}</span><b>{task.cancelReason ?? t('cpm.gantt.cancel.meetingSource', { defaultValue: '來源會議已取消' })}</b></div>
+        </div>
+      ),
+      okText: t('cpm.gantt.cancel.restoreOk', { defaultValue: '恢復' }),
+      cancelText: t('common.cancel', { defaultValue: '取消' }),
+      onOk: () => {
+        // 恢复取消态走专用接口（软删 restore 是另一语义）；本地先解冻，失败由 syncError 重载还原
+        setData(d => ({
+          ...d,
+          groups: d.groups.map(x => x.id !== gid ? x : {
+            ...x,
+            tasks: x.tasks.map(t => t.id === task.id ? { ...t, cancelled: false, cancelReason: null } : t),
+          }),
+        }))
+        void apiRestoreState(Number(task.id)).catch(syncError)
+        message.success(t('cpm.gantt.msg.restored', { defaultValue: '已恢復，任務可正常編輯' }))
+      },
+    })
+  }, [syncError, t])
+  const submitMark = () => {
+    if (!markTarget) return
+    const reason = markReason.trim()
+    if (!reason) { setMarkError(t('cpm.gantt.msg.reasonRequired', { defaultValue: '原因為必填，請填寫後再確認' })); return }
+    const { kind, gid, task } = markTarget
+    if (kind === 'block') patchTask(gid, task.id, { blocked: true, blockedReason: reason })
+    else patchTask(gid, task.id, { cancelled: true, cancelReason: reason })
+    message.success(kind === 'block'
+      ? t('cpm.gantt.msg.blocked', { defaultValue: '已標記阻塞，進度與備註仍可正常編輯' })
+      : t('cpm.gantt.msg.cancelled', { defaultValue: '已取消該任務，編輯已凍結；僅可刪除或恢復' }))
+    setMarkTarget(null)
   }
-  const openNote = (g: GanttGroup, task: GanttTask) => setNoteTarget({ gid: g.id, tid: task.id, title: task.title, note: task.note })
-  const offerUndo = (label: string, restore: () => void) => {
+  const openNote = useCallback((g: GanttGroup, task: GanttTask) => {
+    setNoteTarget({ gid: g.id, tid: task.id, title: task.title, note: task.note })
+  }, [])
+  const offerUndo = useCallback((label: string, restore: () => void) => {
     undoRef.current = restore
     message.open({
       key: 'wg-undo',
@@ -453,8 +604,8 @@ export default function WorklogGantt() {
         </span>
       ),
     })
-  }
-  const deleteTask = (g: GanttGroup, task: GanttTask) => {
+  }, [t])
+  const deleteTask = useCallback((g: GanttGroup, task: GanttTask) => {
     Modal.confirm({
       title: t('cpm.gantt.confirm.deleteTaskTitle', { defaultValue: '確定刪除該子任務？' }),
       className: 'custom-confirm-modal',
@@ -485,14 +636,14 @@ export default function WorklogGantt() {
                   return { ...x, tasks }
                 }),
               }))
-              await reload()
+              await reloadRef.current()
             } catch (e) { syncError(e) }
           })()
         })
       },
     })
-  }
-  const deleteGroup = (g: GanttGroup) => {
+  }, [offerUndo, syncError, t])
+  const deleteGroup = useCallback((g: GanttGroup) => {
     // 未分组虚拟容器不可删：它没有服务端行，DELETE /groups/0 只会报「工作項不存在或不属于本人」
     if (isVirtualGroup(Number(g.id))) return
     Modal.confirm({
@@ -512,7 +663,7 @@ export default function WorklogGantt() {
       cancelText: t('common.cancel', { defaultValue: '取消' }),
       okButtonProps: { danger: true },
       onOk: () => {
-        const idx = data.groups.findIndex(x => x.id === g.id)
+        const idx = dataRef.current.groups.findIndex(x => x.id === g.id)
         setData(d => ({ ...d, groups: d.groups.filter(x => x.id !== g.id) }))
         void apiDeleteGroup(Number(g.id)).catch(syncError)
         offerUndo(t('cpm.gantt.msg.itemDeleted', { defaultValue: '已刪除工作項。' }), () => {
@@ -521,17 +672,17 @@ export default function WorklogGantt() {
               await apiRestoreGroup(Number(g.id))
               setData(d => {
                 const groups = [...d.groups]
-                groups.splice(Math.min(idx, groups.length), 0, g)
+                groups.splice(Math.min(Math.max(idx, 0), groups.length), 0, g)
                 return { ...d, groups }
               })
-              await reload()
+              await reloadRef.current()
             } catch (e) { syncError(e) }
           })()
         })
       },
     })
-  }
-  const reorder = (gid: string, fromId: string, toId: string) => {
+  }, [offerUndo, syncError, t])
+  const reorder = useCallback((gid: string, fromId: string, toId: string) => {
     if (fromId === toId) return
     setData(d => ({
       ...d,
@@ -547,7 +698,7 @@ export default function WorklogGantt() {
       }),
     }))
     // 子任务行序就是用户拖出来的事实：服务端按条目 id 顺序重排，不依赖前端临时 id
-    const group = data.groups.find(g => g.id === gid)
+    const group = dataRef.current.groups.find(g => g.id === gid)
     if (group) {
       const next = [...group.tasks]
       const from = next.findIndex(t => t.id === fromId)
@@ -558,20 +709,24 @@ export default function WorklogGantt() {
         void apiReorderGroups(next.map(t => Number(t.id))).catch(syncError)
       }
     }
-  }
-  const commitStart = (g: GanttGroup, task: GanttTask, val: string | null) => {
+  }, [syncError])
+  const commitStart = useCallback((gid: string, task: GanttTask, val: string | null) => {
     const patch: Partial<GanttTask> = { start: val }
     if (val && task.end && task.end < val) patch.end = val
-    patchTask(g.id, task.id, patch)
-  }
-  const commitEnd = (g: GanttGroup, task: GanttTask, val: string | null) => {
+    patchTask(gid, task.id, patch)
+  }, [patchTask])
+  const commitEnd = useCallback((gid: string, task: GanttTask, val: string | null) => {
     if (val && task.start && val < task.start) {
       message.warning(t('cpm.gantt.msg.endBeforeStart', { defaultValue: '結束日期不能早於開始日期，已對齊開始日期' }))
-      patchTask(g.id, task.id, { end: task.start })
+      patchTask(gid, task.id, { end: task.start })
       return
     }
-    patchTask(g.id, task.id, { end: val })
-  }
+    patchTask(gid, task.id, { end: val })
+  }, [patchTask, t])
+  const scheduleTask = useCallback((gid: string, tid: string, key: string) => {
+    patchTask(gid, tid, { start: key, end: key })
+  }, [patchTask])
+  const reloadLedger = useCallback(async () => { await reloadRef.current() }, [])
   const scrollToToday = (smooth = true) => {
     const idx = visibleDays.findIndex(d => d.today)
     const el = scrollRef.current
@@ -590,27 +745,45 @@ export default function WorklogGantt() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  /* 量取甘特可用寬度（容器寬 − 左欄寬），供聚焦區間鋪滿日列。
-   * 每次提交後都重量：收合/预设切换/筛选/数据变化都会重排左栏或轴线，
-   * 只在少數幾個 state 上挂依赖曾導致 paneAvail 陳舊、日列縮回基準寬右側留白。
-   * setPaneAvail 带容差守衛，值不變不重渲染，不會成環。 */
-  const measurePane = () => {
+  /* 量取甘特可用寬度与滚动窗口。
+   * 只在布局相关状态变化、容器尺寸变化或滚动时量；高频 hover/drag 不再每 render 强制读布局。 */
+  const measurePane = useCallback(() => {
     const el = scrollRef.current
     if (!el) return
     const left = el.querySelector('.wg-left')
     const lw = left ? left.getBoundingClientRect().width : 0
     const next = Math.max(0, el.clientWidth - lw)
     setPaneAvail(v => (Math.abs(v - next) > 1 ? next : v))
-  }
-  useLayoutEffect(() => { measurePane() })
+    const top = el.scrollTop
+    const height = el.clientHeight
+    setScrollMetrics(s => (Math.abs(s.top - top) < 2 && s.height === height ? s : { top, height }))
+  }, [])
+  useLayoutEffect(() => {
+    measurePane()
+  }, [measurePane, viewMode, collapsed, data.groups.length, filteredGroups.length, totalTaskCount, visibleDays.length])
   useEffect(() => {
     const el = scrollRef.current
     if (!el) return
+    let raf = 0
+    const onScroll = () => {
+      if (raf) return
+      raf = requestAnimationFrame(() => {
+        raf = 0
+        measurePane()
+      })
+    }
     const ro = new ResizeObserver(measurePane)
     ro.observe(el)
     window.addEventListener('resize', measurePane)
-    return () => { ro.disconnect(); window.removeEventListener('resize', measurePane) }
-  }, [])
+    el.addEventListener('scroll', onScroll, { passive: true })
+    measurePane()
+    return () => {
+      if (raf) cancelAnimationFrame(raf)
+      ro.disconnect()
+      window.removeEventListener('resize', measurePane)
+      el.removeEventListener('scroll', onScroll)
+    }
+  }, [measurePane, loading, data.groups.length, filteredGroups.length, totalTaskCount])
 
   /* ---------- 导出：长图 PNG / A4 PDF / CSV ---------- */
   const runExport = async (kind: DocumentExportKind | 'csv') => {
@@ -619,25 +792,35 @@ export default function WorklogGantt() {
       message.success(t('cpm.gantt.msg.csvDone', { defaultValue: '已導出 CSV，Excel 可直接打開' }))
       return
     }
-    const src = sheetRef.current
-    if (!src) { message.warning(t('cpm.gantt.msg.sheetNotReady', { defaultValue: '台账尚未載入' })); return }
     setExportBusy(kind)
-    // 离屏克隆展开滚动区：截整张台账（全部周列 + 全部行），不动真实 DOM
-    const host = document.createElement('div')
-    host.className = 'wg-capture-host'
-    const clone = src.cloneNode(true) as HTMLElement
-    host.appendChild(clone)
-    document.body.appendChild(host)
+    // 虚拟化只挂载窗口行；导出前临时展开全量，避免长图/PDF 只截到当前可见区。
+    const shouldRenderAll = totalTaskCount > VIRTUAL_ROW_THRESHOLD
+    if (shouldRenderAll) setExportRenderAll(true)
     try {
-      const fileBase = t('cpm.gantt.export.fileBase', { date: fmt(dayjs()), defaultValue: '我的工作記錄_{{date}}' })
-      await exportDocument(clone, kind, fileBase, { alias: 'cpm-worklog-gantt', fallbackName: 'worklog' })
-      message.success(kind === 'image'
-        ? t('cpm.gantt.export.imageDone', { defaultValue: '已下載當前台账的長圖快照' })
-        : t('cpm.gantt.export.pdfDone', { defaultValue: '已下載當前台账的 A4 分頁 PDF' }))
+      if (shouldRenderAll) {
+        await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))
+      }
+      const src = sheetRef.current
+      if (!src) { message.warning(t('cpm.gantt.msg.sheetNotReady', { defaultValue: '台账尚未載入' })); return }
+      // 离屏克隆展开滚动区：截整张台账（全部周列 + 全部行），不动真实 DOM
+      const host = document.createElement('div')
+      host.className = 'wg-capture-host'
+      const clone = src.cloneNode(true) as HTMLElement
+      host.appendChild(clone)
+      document.body.appendChild(host)
+      try {
+        const fileBase = t('cpm.gantt.export.fileBase', { date: fmt(dayjs()), defaultValue: '我的工作記錄_{{date}}' })
+        await exportDocument(clone, kind, fileBase, { alias: 'cpm-worklog-gantt', fallbackName: 'worklog' })
+        message.success(kind === 'image'
+          ? t('cpm.gantt.export.imageDone', { defaultValue: '已下載當前台账的長圖快照' })
+          : t('cpm.gantt.export.pdfDone', { defaultValue: '已下載當前台账的 A4 分頁 PDF' }))
+      } finally {
+        host.remove()
+      }
     } catch (e) {
       message.error(e instanceof Error ? e.message : t('cpm.gantt.export.failed', { defaultValue: '導出失敗，請重試' }))
     } finally {
-      host.remove()
+      if (shouldRenderAll) setExportRenderAll(false)
       setExportBusy(null)
     }
   }
@@ -666,6 +849,63 @@ export default function WorklogGantt() {
   }, [filteredGroups, sort, rangeStartStr, rangeEndStr, data])
   const displayGroups = viewMode === 'list' ? sortedGroups : filteredGroups
 
+  /* 行几何与派生值一次算完：左右两栏只消费同一份 meta，不再各自重复估行高、工时和信号标签。 */
+  const renderGroups = useMemo<GroupRenderMeta[]>(() => {
+    let rowCursor = 0
+    let topCursor = 0
+    return displayGroups.map(g => {
+      const startRow = rowCursor
+      const groupTop = topCursor
+      let rowsTop = 0
+      const rows = g.tasks.map(t => {
+        const markRow = t.planType === 'inserted' || !!t.followUp || !!t.blocked || crossesWeek(t.start, t.end)
+        const signalRow = overdueDaysOf(t) > 0 || stalledDaysOf(t) > 0
+        const rowH = taskRowH(t.title, (markRow ? 1 : 0) + (signalRow ? 1 : 0))
+        const view = viewOf(t)
+        const hours = hoursOf(t)
+        const workdays = workdaysOf(t)
+        rowCursor += 1
+        const offsetInGroup = rowsTop
+        rowsTop += rowH
+        return {
+          task: t,
+          rowH,
+          offsetInGroup,
+          markRow,
+          signalRow,
+          hours,
+          workdays,
+          overtime: splitHours(hours, workdays).overtime,
+          view,
+          color: progressColor(view.value),
+        }
+      })
+      const height = rowsTop + ADD_ROW_H
+      topCursor += height
+      return { group: g, rows, top: groupTop, startRow, endRow: rowCursor, height }
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [displayGroups, data, rangeStartStr, rangeEndStr])
+
+  const flatRows = useMemo(() => {
+    const out: { offset: number; height: number }[] = []
+    renderGroups.forEach(g => g.rows.forEach(r => out.push({ offset: g.top + r.offsetInGroup, height: r.rowH })))
+    return out
+  }, [renderGroups])
+  const contentHeight = useMemo(() => renderGroups.reduce((sum, g) => sum + g.height, 0) + END_CAP_H, [renderGroups])
+  const virtualize = totalTaskCount > VIRTUAL_ROW_THRESHOLD && !exportRenderAll
+  const visibleRange = useMemo(() => {
+    if (!virtualize) return { start: 0, end: flatRows.length }
+    const startPx = Math.max(0, scrollMetrics.top - VIRTUAL_OVERSCAN_PX)
+    const endPx = scrollMetrics.top + Math.max(scrollMetrics.height, 320) + VIRTUAL_OVERSCAN_PX
+    let start = 0
+    while (start < flatRows.length && flatRows[start].offset + flatRows[start].height < startPx) start += 1
+    let end = flatRows.length
+    while (end > start && flatRows[end - 1].offset > endPx) end -= 1
+    return { start, end }
+  }, [virtualize, flatRows, scrollMetrics])
+  const atBottom = scrollMetrics.height <= 0 || scrollMetrics.top + scrollMetrics.height >= contentHeight - 4
+
   const statCards = [
     { label: t('cpm.gantt.stat.avg', { defaultValue: '項目平均進度' }), value: stats.avg, suffix: t('cpm.gantt.suffix.percent', { defaultValue: '%' }), icon: <DashboardOutlined />, color: 'var(--brand)', bg: 'var(--brand-soft)', title: t('cpm.gantt.stat.avgTip', { defaultValue: '區間內任務的當前平均進度' }) },
     { label: rangeStartStr ? t('cpm.gantt.stat.doneInPeriod', { defaultValue: '本期完成' }) : t('cpm.status.done', { defaultValue: '已完成' }), value: stats.done, suffix: t('cpm.gantt.suffix.item', { defaultValue: ' 項' }), icon: <CheckCircleOutlined />, color: 'var(--success)', bg: 'var(--success-soft)', title: rangeStartStr ? t('cpm.gantt.stat.doneTip', { defaultValue: '完成時點落在查詢區間（與匯報同口徑）' }) : t('cpm.gantt.stat.doneNowTip', { defaultValue: '當前狀態為已完成' }) },
@@ -680,7 +920,7 @@ export default function WorklogGantt() {
         ? t('cpm.gantt.stat.hoursSplitTip', { normal: stats.hours - stats.overtime, overtime: stats.overtime, defaultValue: '正常 {{normal}}h ＋ 加班 {{overtime}}h；加班不另存列，由合计减工作日 × 8h 派生' })
         : t('cpm.gantt.stat.hoursTip', { defaultValue: '區間交集工作日 × 8h' }),
     },
-    { label: t('cpm.gantt.plan.inserted', { defaultValue: '臨時插入' }), value: stats.inserted, suffix: t('cpm.gantt.suffix.item', { defaultValue: ' 項' }), icon: <ThunderboltOutlined />, color: 'var(--warning-deep)', bg: 'var(--warning-soft)', title: rangeStartStr ? t('cpm.gantt.stat.insertedTip', { defaultValue: '插入時點落在查詢區間' }) : t('cpm.gantt.stat.insertedAllTip', { defaultValue: '全部標記為臨時插入的工作項' }) },
+    { label: t('cpm.gantt.plan.inserted', { defaultValue: '臨時任務' }), value: stats.inserted, suffix: t('cpm.gantt.suffix.item', { defaultValue: ' 項' }), icon: <ThunderboltOutlined />, color: 'var(--warning-deep)', bg: 'var(--warning-soft)', title: rangeStartStr ? t('cpm.gantt.stat.insertedTip', { defaultValue: '插入時點落在查詢區間' }) : t('cpm.gantt.stat.insertedAllTip', { defaultValue: '全部標記為臨時任務的工作項' }) },
   ]
 
   return (
@@ -713,14 +953,25 @@ export default function WorklogGantt() {
               ]}
             />
           </Form.Item>
-          <Form.Item label={t('cpm.gantt.search.plan', { defaultValue: '計劃屬性' })}>
+          <Form.Item label={(
+            <span>
+              {t('cpm.gantt.search.plan', { defaultValue: '計劃屬性' })}
+              <HelpPopover
+                title={t('cpm.gantt.plan.caliberTitle', { defaultValue: '計劃屬性過濾口徑' })}
+                content={t('cpm.gantt.plan.caliber', { defaultValue: '「計劃任務」與「臨時任務」互斥，每條任務只屬其一；「跟進任務」是獨立維度——一條任務可以既是臨時任務又被標記跟進，切到這兩檔都會看到它。各檔按當前所選精確過濾，命中即顯示。' })}
+                ariaLabel={t('cpm.gantt.plan.caliberTitle', { defaultValue: '計劃屬性過濾口徑' })}
+                width={340}
+              />
+            </span>
+          )}>
             <Select
               value={planFilter}
               onChange={v => setPlanFilter(v)}
               options={[
                 { value: 'all', label: t('cpm.gantt.search.allPlan', { defaultValue: '全部屬性' }) },
-                { value: 'planned', label: t('cpm.gantt.plan.planned', { defaultValue: '原計劃' }) },
-                { value: 'inserted', label: t('cpm.gantt.plan.inserted', { defaultValue: '臨時插入' }) },
+                { value: 'planned', label: t('cpm.gantt.plan.planned', { defaultValue: '計劃任務' }) },
+                { value: 'inserted', label: t('cpm.gantt.plan.inserted', { defaultValue: '臨時任務' }) },
+                { value: 'follow', label: t('cpm.gantt.plan.follow', { defaultValue: '跟進任務' }) },
               ]}
             />
           </Form.Item>
@@ -882,6 +1133,7 @@ export default function WorklogGantt() {
                     /* 列名用公共层的 common.colStatus（与其他列表页表头同一词），不另造重复词条 */
                     [t('common.colStatus', { defaultValue: '狀態' }), 'var(--wg-status)', 'wg-h--status'],
                     [t('cpm.gantt.col.note', { defaultValue: '備註原因' }), 'var(--wg-note)', 'wg-h--note'],
+                    [t('cpm.gantt.col.ops', { defaultValue: '操作' }), 'var(--wg-ops)', 'wg-h--ops'],
                   ] as const).map(([label, w, cls]) => {
                     const sortKey = cls === 'wg-h--start' ? 'start' as const : cls === 'wg-h--prog' ? 'progress' as const : cls === 'wg-h--hours' ? 'hours' as const : null
                     const sortable = sortKey !== null && viewMode === 'list'
@@ -900,62 +1152,83 @@ export default function WorklogGantt() {
                     )
                   })}
                 </div>
-                {displayGroups.map(g => (
-                  <div key={g.id} className="wg-group" style={{ '--group-color': GROUP_COLORS[g.hue % GROUP_COLORS.length] } as CSSProperties}>
-                    <div className="wg-req">
-                      <div className="wg-req__title">
-                        {/* 虚拟分组：服务端 title=null 汇成空字符串，直接渲染就是生产上那条「没有名称的工作項」；
-                            它是只读容器，不给 InlineText 改名入口，词由界面按语言给 */}
-                        {g.virtual ? (
-                          <Tooltip title={t('cpm.gantt.req.ungroupedTip', { defaultValue: '未歸檔到工作項的記錄（舊日報流水/關聯導入）。此分組不可改名或刪除，刪除或移動其中的子任務即可清空它。' })}>
-                            <span className="wg-inline">{t('cpm.gantt.req.ungroupedTitle', { defaultValue: '未分組記錄' })}</span>
+                {renderGroups.map(gm => {
+                  const g = gm.group
+                  return (
+                    <div
+                      key={g.id}
+                      className="wg-group"
+                      style={{
+                        '--group-color': GROUP_COLORS[g.hue % GROUP_COLORS.length],
+                        ...(virtualize ? { height: gm.height } : {}),
+                      } as CSSProperties}
+                    >
+                      <div className="wg-req">
+                        <div className="wg-req__title">
+                          {/* 虚拟分组：服务端 title=null 汇成空字符串，直接渲染就是生产上那条「没有名称的工作項」；
+                              它是只读容器，不给 InlineText 改名入口，词由界面按语言给 */}
+                          {g.virtual ? (
+                            <Tooltip title={t('cpm.gantt.req.ungroupedTip', { defaultValue: '未歸檔到工作項的記錄（舊日報流水/關聯導入）。此分組不可改名或刪除，刪除或移動其中的子任務即可清空它。' })}>
+                              <span className="wg-inline">{t('cpm.gantt.req.ungroupedTitle', { defaultValue: '未分組記錄' })}</span>
+                            </Tooltip>
+                          ) : (
+                            <InlineText value={g.title} autoEdit={freshId === g.id} onSave={v => patchGroup(g.id, { title: v })} />
+                          )}
+                        </div>
+                        <div className="wg-req__ops">
+                          <Tooltip title={t('cpm.gantt.req.addTask', { defaultValue: '添加子任務' })}>
+                            <Button type="link" size="small" icon={<PlusOutlined />} onClick={() => addTask(g.id)} />
                           </Tooltip>
-                        ) : (
-                          <InlineText value={g.title} autoEdit={freshId === g.id} onSave={v => patchGroup(g.id, { title: v })} />
-                        )}
+                          {!g.virtual && (
+                            <Tooltip title={t('cpm.gantt.req.deleteItem', { defaultValue: '刪除工作項' })}>
+                              <Button type="link" size="small" danger icon={<DeleteOutlined />} onClick={() => deleteGroup(g)} />
+                            </Tooltip>
+                          )}
+                        </div>
                       </div>
-                      <div className="wg-req__ops">
-                        <Tooltip title={t('cpm.gantt.req.addTask', { defaultValue: '添加子任務' })}>
-                          <Button type="link" size="small" icon={<PlusOutlined />} onClick={() => addTask(g.id)} />
-                        </Tooltip>
-                        {!g.virtual && (
-                          <Tooltip title={t('cpm.gantt.req.deleteItem', { defaultValue: '刪除工作項' })}>
-                            <Button type="link" size="small" danger icon={<DeleteOutlined />} onClick={() => deleteGroup(g)} />
-                          </Tooltip>
-                        )}
+                      <div className={`wg-rows${virtualize ? ' wg-rows--virtual' : ''}`} style={virtualize ? { height: gm.height } : undefined}>
+                        {gm.rows.map((meta, ri) => {
+                          const globalIndex = gm.startRow + ri
+                          if (virtualize && (globalIndex < visibleRange.start || globalIndex >= visibleRange.end)) return null
+                          return (
+                            <LeftRow
+                              key={meta.task.id}
+                              group={g}
+                              meta={meta}
+                              hover={hoverId === meta.task.id}
+                              top={meta.offsetInGroup}
+                              firstRow={ri === 0}
+                              virtualized={virtualize}
+                              onHover={setHoverId}
+                              fresh={freshId === meta.task.id}
+                              dropTarget={dropId === meta.task.id}
+                              onDropTarget={setDropId}
+                              onReorder={reorder}
+                              onPatchTask={patchTask}
+                              onPreviewTask={previewTask}
+                              onStartTask={commitStart}
+                              onEndTask={commitEnd}
+                              onDeleteTask={deleteTask}
+                              onEditNote={openNote}
+                              onToggleInserted={toggleInserted}
+                              onToggleFollowUp={toggleFollowUp}
+                              onToggleBlock={toggleBlock}
+                              onToggleCancel={toggleCancel}
+                              onRestore={restoreCancelled}
+                              syncGateOpen={syncGateOpen}
+                              onReload={reloadLedger}
+                              viewEnd={viewEndStr}
+                              viewLabel={rangeLabel}
+                            />
+                          )
+                        })}
+                        <div className={`wg-addrow${virtualize ? ' wg-addrow--virtual' : ''}`}>
+                          <Button type="link" size="small" icon={<PlusOutlined />} onClick={() => addTask(g.id)}>{t('cpm.gantt.req.addTask', { defaultValue: '添加子任務' })}</Button>
+                        </div>
                       </div>
                     </div>
-                    <div className="wg-rows">
-                      {g.tasks.map(t => (
-                        <LeftRow
-                          key={t.id}
-                          group={g}
-                          task={t}
-                          data={data}
-                          hover={hoverId === t.id}
-                          onHover={setHoverId}
-                          fresh={freshId === t.id}
-                          dropTarget={dropId === t.id}
-                          onDropTarget={setDropId}
-                          onReorder={(from, to) => reorder(g.id, from, to)}
-                          onPatch={patch => patchTask(g.id, t.id, patch)}
-                          onStart={v => commitStart(g, t, v)}
-                          onEnd={v => commitEnd(g, t, v)}
-                          onDelete={() => deleteTask(g, t)}
-                          onEditNote={() => openNote(g, t)}
-                          onToggleInserted={() => toggleInserted(g.id, t)}
-                          syncGateOpen={syncGateOpen}
-                          onReload={async () => { await reload() }}
-                          viewEnd={viewEndStr}
-                          viewLabel={rangeLabel}
-                        />
-                      ))}
-                      <div className="wg-addrow">
-                        <Button type="link" size="small" icon={<PlusOutlined />} onClick={() => addTask(g.id)}>{t('cpm.gantt.req.addTask', { defaultValue: '添加子任務' })}</Button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
               {/* 右側時間軸 */}
               <div className="wg-right" style={{ width: visibleDays.length * dayW }}>
@@ -980,35 +1253,52 @@ export default function WorklogGantt() {
                     ))}
                   </div>
                 </div>
-                {displayGroups.map(g => (
-                  <div key={g.id} className="wg-group-r">
-                    {g.tasks.map(t => (
-                      <RightRow
-                        key={t.id}
-                        group={g}
-                        task={t}
-                        data={data}
-                        days={visibleDays}
-                        colW={dayW}
-                        hover={hoverId === t.id}
-                        onHover={setHoverId}
-                        drag={drag}
-                        onDrag={setDrag}
-                        scrollRef={scrollRef}
-                        onPatch={patch => patchTask(g.id, t.id, patch)}
-                        onStart={v => commitStart(g, t, v)}
-                        onEnd={v => commitEnd(g, t, v)}
-                        onSchedule={key => patchTask(g.id, t.id, { start: key, end: key })}
-                        onEditNote={() => openNote(g, t)}
-                        onToggleInserted={() => toggleInserted(g.id, t)}
-                        viewEnd={viewEndStr}
-                        viewLabel={rangeLabel}
-                      />
-                    ))}
-                    <div className="wg-addrow-r" />
-                  </div>
-                ))}
+                {renderGroups.map(gm => {
+                  const g = gm.group
+                  return (
+                    <div key={g.id} className={`wg-group-r${virtualize ? ' wg-group-r--virtual' : ''}`} style={virtualize ? { height: gm.height } : undefined}>
+                      {gm.rows.map((meta, ri) => {
+                        const globalIndex = gm.startRow + ri
+                        if (virtualize && (globalIndex < visibleRange.start || globalIndex >= visibleRange.end)) return null
+                        return (
+                          <RightRow
+                            key={meta.task.id}
+                            group={g}
+                            meta={meta}
+                            data={data}
+                            days={visibleDays}
+                            colW={dayW}
+                            hover={hoverId === meta.task.id}
+                            top={meta.offsetInGroup}
+                            firstRow={ri === 0}
+                            virtualized={virtualize}
+                            onHover={setHoverId}
+                            drag={drag?.taskId === meta.task.id ? drag : null}
+                            onDrag={setDrag}
+                            scrollRef={scrollRef}
+                            onPatchTask={patchTask}
+                            onPreviewTask={previewTask}
+                            onStartTask={commitStart}
+                            onEndTask={commitEnd}
+                            onScheduleTask={scheduleTask}
+                            onEditNote={openNote}
+                            onToggleInserted={toggleInserted}
+                            onToggleFollowUp={toggleFollowUp}
+                            viewEnd={viewEndStr}
+                            viewLabel={rangeLabel}
+                          />
+                        )
+                      })}
+                      <div className={`wg-addrow-r${virtualize ? ' wg-addrow-r--virtual' : ''}`} />
+                    </div>
+                  )
+                })}
               </div>
+            </div>
+            <div className={`wg-endcap${atBottom ? ' is-visible' : ''}`} style={{ height: END_CAP_H }}>
+              <span className="wg-endcap__line" />
+              <span>{t('cpm.gantt.list.end', { count: totalTaskCount, defaultValue: '已顯示全部 {{count}} 個子任務' })}</span>
+              <span className="wg-endcap__line" />
             </div>
           </div>
           <div className="wg-tabbar">
@@ -1031,19 +1321,27 @@ export default function WorklogGantt() {
                 {PROGRESS_BANDS.map(b => (
                   <span key={b.label} className="wg-legend__item"><i style={{ background: b.color }} />{b.label}</span>
                 ))}
-                <span className="wg-legend__item"><i className="wg-lg-inserted" />{t('cpm.gantt.plan.inserted', { defaultValue: '臨時插入' })}</span>
+                <span className="wg-legend__item"><i className="wg-lg-inserted" />{t('cpm.gantt.plan.inserted', { defaultValue: '臨時任務' })}</span>
                 <span className="wg-legend__item"><i className="wg-lg-cancelled" />{t('cpm.status.cancelled', { defaultValue: '已取消' })}</span>
               </span>
             </span>
-            <span>
-              {t('cpm.gantt.tabbar.summary', {
-                tasks: stats.total, workdays: visibleDays.filter(d => !d.rest).length,
-                defaultValue: '{{tasks}} 個子任務 · {{workdays}} 個工作日',
-              })}
-              {/* 已取消单独报一句：它已从待完成里排掉，不说明去哪了会让人以为数字算错 */}
-              {stats.cancelled > 0 && t('cpm.gantt.tabbar.cancelled', {
-                count: stats.cancelled, defaultValue: ' · {{count}} 項已取消（不計工時）',
-              })}
+            <span className="wg-tabbar__right">
+              <span>
+                {t('cpm.gantt.tabbar.summary', {
+                  tasks: stats.total, workdays: visibleDays.filter(d => !d.rest).length,
+                  defaultValue: '{{tasks}} 個子任務 · {{workdays}} 個工作日',
+                })}
+                {/* 已取消单独报一句：它已从待完成里排掉，不说明去哪了会让人以为数字算错 */}
+                {stats.cancelled > 0 && t('cpm.gantt.tabbar.cancelled', {
+                  count: stats.cancelled, defaultValue: ' · {{count}} 項已取消（不計工時）',
+                })}
+              </span>
+              <span className={`wg-list-state${atBottom ? ' is-end' : ''}`}>
+                {atBottom ? <CheckCircleOutlined /> : <CaretDownOutlined />}
+                {atBottom
+                  ? t('cpm.gantt.list.atEnd', { count: totalTaskCount, defaultValue: '已到底 · 共 {{count}} 項' })
+                  : t('cpm.gantt.list.more', { defaultValue: '向下滾動查看更多' })}
+              </span>
             </span>
           </div>
         </div>
@@ -1053,6 +1351,38 @@ export default function WorklogGantt() {
         onClose={() => setNoteTarget(null)}
         onSave={html => { if (noteTarget) patchTask(noteTarget.gid, noteTarget.tid, { note: html }) }}
       />
+
+      {/* 阻塞/取消原因面板：原因必填（确认时非空校验），两档共用按 kind 切文案 */}
+      <Modal
+        open={!!markTarget}
+        title={markTarget?.kind === 'block'
+          ? t('cpm.gantt.block.modalTitle', { title: markTarget?.task.title ?? '', defaultValue: '標記阻塞・{{title}}' })
+          : t('cpm.gantt.cancel.modalTitle', { title: markTarget?.task.title ?? '', defaultValue: '取消任務・{{title}}' })}
+        okText={t('common.confirm', { defaultValue: '確認' })}
+        cancelText={t('common.cancel', { defaultValue: '取消' })}
+        onCancel={() => setMarkTarget(null)}
+        onOk={submitMark}
+        destroyOnClose
+        width={520}
+      >
+        <p className="wg-mark-hint">
+          {markTarget?.kind === 'block'
+            ? t('cpm.gantt.block.hint', { defaultValue: '阻塞只作狀態標記：任務仍可正常編輯進度、備註與排期；原因會顯示在阻塞徽標的懸停提示裡。' })
+            : t('cpm.gantt.cancel.hint', { defaultValue: '取消後該任務的編輯全部凍結（標題/進度/排期/備註/標記），僅保留「刪除」與「恢復」兩個入口。' })}
+        </p>
+        <Input.TextArea
+          value={markReason}
+          onChange={e => { setMarkReason(e.target.value); if (markError) setMarkError(null) }}
+          rows={3}
+          maxLength={200}
+          showCount
+          status={markError ? 'error' : undefined}
+          placeholder={markTarget?.kind === 'block'
+            ? t('cpm.gantt.block.placeholder', { defaultValue: '請填寫阻塞原因（必填）' })
+            : t('cpm.gantt.cancel.placeholder', { defaultValue: '請填寫取消原因（必填）' })}
+        />
+        {markError && <p className="wg-mark-error">{markError}</p>}
+      </Modal>
 
       {/* 日视图并入：三个面板都落同一批 biz_cpm_item，导入后统一重拉台账而不本地拼行，
           否则服务端写的 group/排期/流水与界面看到的会飘开 */}
@@ -1080,12 +1410,12 @@ export default function WorklogGantt() {
 
 /* ==================== 行內標題編輯 ==================== */
 
-function InlineText({ value, onSave, autoEdit, done }: { value: string; onSave: (v: string) => void; autoEdit?: boolean; done?: boolean }) {
+function InlineText({ value, onSave, autoEdit, done, editable = true }: { value: string; onSave: (v: string) => void; autoEdit?: boolean; done?: boolean; editable?: boolean }) {
   const { t } = useTranslation()
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(value)
   useEffect(() => {
-    if (autoEdit) { setDraft(value); setEditing(true) }
+    if (autoEdit && editable) { setDraft(value); setEditing(true) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoEdit])
   const commit = () => {
@@ -1111,8 +1441,8 @@ function InlineText({ value, onSave, autoEdit, done }: { value: string; onSave: 
   return (
     <span
       className={`wg-inline${done ? ' wg-task__title--done' : ''}`}
-      title={t('cpm.gantt.inline.clickToEdit', { defaultValue: '點擊修改' })}
-      onClick={e => { e.stopPropagation(); setDraft(value); setEditing(true) }}
+      title={editable ? t('cpm.gantt.inline.clickToEdit', { defaultValue: '點擊修改' }) : undefined}
+      onClick={editable ? (e => { e.stopPropagation(); setDraft(value); setEditing(true) }) : undefined}
     >
       {value}
     </span>
@@ -1123,20 +1453,27 @@ function InlineText({ value, onSave, autoEdit, done }: { value: string; onSave: 
 
 interface LeftRowProps {
   group: GanttGroup
-  task: GanttTask
-  data: GanttData
+  meta: TaskRenderMeta
   hover: boolean
+  top: number
+  firstRow: boolean
+  virtualized: boolean
   onHover: (id: string | null) => void
   fresh: boolean
   dropTarget: boolean
   onDropTarget: (id: string | null) => void
-  onReorder: (from: string, to: string) => void
-  onPatch: (patch: Partial<GanttTask>) => void
-  onStart: (v: string | null) => void
-  onEnd: (v: string | null) => void
-  onDelete: () => void
-  onEditNote: () => void
-  onToggleInserted: () => void
+  onReorder: (gid: string, from: string, to: string) => void
+  onPatchTask: (gid: string, tid: string, patch: Partial<GanttTask>) => void
+  onPreviewTask: (gid: string, tid: string, patch: Partial<GanttTask>) => void
+  onStartTask: (gid: string, task: GanttTask, v: string | null) => void
+  onEndTask: (gid: string, task: GanttTask, v: string | null) => void
+  onDeleteTask: (group: GanttGroup, task: GanttTask) => void
+  onEditNote: (group: GanttGroup, task: GanttTask) => void
+  onToggleInserted: (gid: string, task: GanttTask) => void
+  onToggleFollowUp: (gid: string, task: GanttTask) => void
+  onToggleBlock: (gid: string, task: GanttTask) => void
+  onToggleCancel: (gid: string, task: GanttTask) => void
+  onRestore: (gid: string, task: GanttTask) => void
   /** RDM 回写总闸（徽标要用）：整页取一次，不逐行发请求 */
   syncGateOpen: boolean
   /** 徽标开关/重新对齐后重拉台账：回写结果只在服务端，本地拼不出真实状态 */
@@ -1146,16 +1483,15 @@ interface LeftRowProps {
   viewLabel: string
 }
 
-function LeftRow({ group, task, data, hover, onHover, fresh, dropTarget, onDropTarget, onReorder, onPatch, onStart, onEnd, onDelete, onEditNote, onToggleInserted, syncGateOpen, onReload, viewEnd, viewLabel }: LeftRowProps) {
+const LeftRow = memo(function LeftRow({ group, meta, hover, top, firstRow, virtualized, onHover, fresh, dropTarget, onDropTarget, onReorder, onPatchTask, onPreviewTask, onStartTask, onEndTask, onDeleteTask, onEditNote, onToggleInserted, onToggleFollowUp, onToggleBlock, onToggleCancel, onRestore, syncGateOpen, onReload, viewEnd, viewLabel }: LeftRowProps) {
   const { t } = useTranslation()
+  const task = meta.task
   const status = taskStatus(task)
-  const hours = taskHours(task, data)
-  const wd = workdayCount(task.start, task.end, data)
-  // 加班量与弹层同一派生（合计 − 工作日 × 8h），不在这里重算口径
-  const overtime = splitHours(hours, wd).overtime
-  // 进度列/色条读服务端期末快照；编辑弹层改的仍是 task.progress（当前真实值）
-  const view = periodProgressOfTask(task)
-  const color = progressColor(view.value)
+  // 取消态冻结全部编辑入口（标题/日期/耗时/进度/备注/标记），操作列只剩删除与恢复
+  const frozen = !!task.cancelled
+  const crossWeek = crossesWeek(task.start, task.end)
+  const overdueDays = overdueDaysOf(task)
+  const stalledDays = stalledDaysOf(task)
   /**
    * 耗时弹层受控开关：保存即收起。
    *
@@ -1164,14 +1500,25 @@ function LeftRow({ group, task, data, hover, onHover, fresh, dropTarget, onDropT
    * 下一次定位很容易命中点不动的旧弹层。与「更新進度」弹层同一做法。
    */
   const [hoursOpen, setHoursOpen] = useState(false)
-  const commitHours = (v: number | null) => {
-    onPatch({ hoursOverride: v })
+  const patch = useCallback((p: Partial<GanttTask>) => onPatchTask(group.id, task.id, p), [group.id, onPatchTask, task.id])
+  const preview = useCallback((p: Partial<GanttTask>) => onPreviewTask(group.id, task.id, p), [group.id, onPreviewTask, task.id])
+  const handleStart = useCallback((v: string | null) => onStartTask(group.id, task, v), [group.id, onStartTask, task])
+  const handleEnd = useCallback((v: string | null) => onEndTask(group.id, task, v), [group.id, onEndTask, task])
+  const handleDelete = useCallback(() => onDeleteTask(group, task), [group, onDeleteTask, task])
+  const handleEditNote = useCallback(() => onEditNote(group, task), [group, onEditNote, task])
+  const handleToggleInserted = useCallback(() => onToggleInserted(group.id, task), [group.id, onToggleInserted, task])
+  const handleToggleFollowUp = useCallback(() => onToggleFollowUp(group.id, task), [group.id, onToggleFollowUp, task])
+  const handleToggleBlock = useCallback(() => onToggleBlock(group.id, task), [group.id, onToggleBlock, task])
+  const handleToggleCancel = useCallback(() => onToggleCancel(group.id, task), [group.id, onToggleCancel, task])
+  const handleRestore = useCallback(() => onRestore(group.id, task), [group.id, onRestore, task])
+  const commitHours = useCallback((v: number | null) => {
+    patch({ hoursOverride: v })
     setHoursOpen(false)
-  }
+  }, [patch])
   return (
     <div
-      className={`wg-row${hover ? ' is-hover' : ''}${dropTarget ? ' wg-row--drop' : ''}`}
-      style={{ height: taskRowH(task.title) }}
+      className={`wg-row${hover ? ' is-hover' : ''}${dropTarget ? ' wg-row--drop' : ''}${firstRow ? ' wg-row--first' : ''}`}
+      style={{ height: meta.rowH, ...(virtualized ? { position: 'absolute', top, left: 0, right: 0 } : {}) } as CSSProperties}
       onMouseEnter={() => onHover(task.id)}
       onMouseLeave={() => onHover(null)}
       onDragOver={e => {
@@ -1183,7 +1530,7 @@ function LeftRow({ group, task, data, hover, onHover, fresh, dropTarget, onDropT
         if (!raw) return
         e.preventDefault()
         const payload = JSON.parse(raw) as { gid: string; tid: string }
-        if (payload.gid === group.id) onReorder(payload.tid, task.id)
+        if (payload.gid === group.id) onReorder(group.id, payload.tid, task.id)
       }}
     >
       <div className="wg-c wg-c--task">
@@ -1196,38 +1543,68 @@ function LeftRow({ group, task, data, hover, onHover, fresh, dropTarget, onDropT
           }}
           onDragEnd={() => onDropTarget(null)}
         />
-        <span className="wg-task__title">
-          <InlineText value={task.title} autoEdit={fresh} done={status === 'done' || status === 'cancelled'} onSave={v => onPatch({ title: v })} />
-        </span>
-        {task.planType === 'inserted' && (
-          <Tooltip title={t('cpm.gantt.insert.tagTip', { date: task.insertedAt ?? t('cpm.gantt.insert.noDate', { defaultValue: '日期未記' }), defaultValue: '臨時插入・{{date}}' })}>
-            <Tag color="volcano" className="wg-insert-tag">{t('cpm.gantt.insert.tag', { defaultValue: '臨時' })}</Tag>
-          </Tooltip>
-        )}
-        <span className="wg-row__ops">
-          <Tooltip title={task.planType === 'inserted' ? t('cpm.gantt.insert.unmarkTip', { defaultValue: '取消臨時插入標記' }) : t('cpm.gantt.insert.markTip', { defaultValue: '標記為臨時插入' })}>
-            <Button type="link" size="small" icon={<ThunderboltOutlined />} onClick={onToggleInserted} />
-          </Tooltip>
-          <Button type="link" size="small" danger icon={<DeleteOutlined />} onClick={onDelete} />
+        <span className="wg-task__main">
+          <span className="wg-task__title">
+            <InlineText value={task.title} autoEdit={fresh} done={status === 'done' || status === 'cancelled'} editable={!frozen} onSave={v => patch({ title: v })} />
+          </span>
+          {meta.markRow && (
+            <span className="wg-task__tags">
+              {task.planType === 'inserted' && (
+                <Tooltip title={t('cpm.gantt.insert.tagTip', { date: task.insertedAt ?? t('cpm.gantt.insert.noDate', { defaultValue: '日期未記' }), defaultValue: '臨時插入・{{date}}' })}>
+                  <Tag color="volcano" className="wg-insert-tag">{t('cpm.gantt.insert.tag', { defaultValue: '臨時' })}</Tag>
+                </Tooltip>
+              )}
+              {task.followUp && (
+                <Tooltip title={t('cpm.gantt.follow.tagTip', { defaultValue: '跟進工作・需要持續後追的事項' })}>
+                  <Tag color="gold" className="wg-follow-tag">{t('cpm.gantt.follow.tag', { defaultValue: '跟進' })}</Tag>
+                </Tooltip>
+              )}
+              {task.blocked && (
+                <Tooltip title={t('cpm.gantt.block.tagTip', { reason: task.blockedReason ?? '', defaultValue: '阻塞中・{{reason}}' })}>
+                  <Tag color="red" className="wg-block-tag">{t('cpm.gantt.block.tag', { defaultValue: '阻塞' })}</Tag>
+                </Tooltip>
+              )}
+              {crossWeek && (
+                <Tooltip title={t('cpm.gantt.crossweek.tagTip', { start: task.start ?? '', end: task.end ?? '', defaultValue: '跨週任務・{{start}} ~ {{end}} 不在同一週（週一起算），會出現在多期週報' })}>
+                  <Tag color="cyan" className="wg-crossweek-tag">{t('cpm.gantt.crossweek.tag', { defaultValue: '跨週' })}</Tag>
+                </Tooltip>
+              )}
+            </span>
+          )}
+          {/* 信号行：逾期/停滯独立子行（核心要点集中在任务子项），状态列回归正常状态 */}
+          {meta.signalRow && (
+            <span className="wg-task__signals">
+              {overdueDays > 0 && (
+                <Tooltip title={t('cpm.gantt.overdue.tagTip', { days: overdueDays, end: task.end ?? '', defaultValue: '逾期 {{days}} 天・結束 {{end}} 已過仍未完成' })}>
+                  <Tag color="red" className="wg-overdue-tag">{t('cpm.gantt.overdue.tag', { defaultValue: '逾期' })}</Tag>
+                </Tooltip>
+              )}
+              {stalledDays > 0 && (
+                <Tooltip title={t('cpm.gantt.stalled.tagTip', { days: stalledDays, threshold: STALL_DAYS, defaultValue: '已 {{days}} 天沒有進度更新（閾值 {{threshold}} 天）' })}>
+                  <Tag color="orange" className="wg-stalled-tag">{t('cpm.gantt.stalled.tag', { defaultValue: '停滯' })}</Tag>
+                </Tooltip>
+              )}
+            </span>
+          )}
         </span>
       </div>
       <div className="wg-c wg-c--start">
-        <DateCell value={task.start} onCommit={onStart} />
+        <DateCell value={task.start} onCommit={handleStart} disabled={frozen} />
       </div>
       <div className="wg-c wg-c--end">
-        <DateCell value={task.end} onCommit={onEnd} />
+        <DateCell value={task.end} onCommit={handleEnd} disabled={frozen} />
       </div>
       {/* 耗時：默认工作日口径，点击弹层可改（与進度列同一交互形状：点击即弹、档位 + 手填） */}
       <Popover
-        trigger="click"
+        trigger={frozen ? [] : 'click'}
         placement="bottom"
         open={hoursOpen}
         onOpenChange={setHoursOpen}
         content={(
           <HoursEditor
             task={task}
-            autoHours={wd * HOURS_PER_DAY}
-            workdays={wd}
+            autoHours={meta.workdays * HOURS_PER_DAY}
+            workdays={meta.workdays}
             onCommit={commitHours}
           />
         )}
@@ -1235,20 +1612,20 @@ function LeftRow({ group, task, data, hover, onHover, fresh, dropTarget, onDropT
         <div className={`wg-c wg-c--hours${task.hoursOverride != null && task.hoursOverride > 0 ? ' wg-c--edited' : ''}${task.start && task.end ? '' : ' wg-c--muted'}`}>
           {task.start && task.end ? (
             <>
-            <Tooltip title={overtime > 0
+            <Tooltip title={meta.overtime > 0
               ? t('cpm.gantt.hours.overtimeTip', {
-                normal: hours - overtime, overtime, days: wd, hours: HOURS_PER_DAY,
+                normal: meta.hours - meta.overtime, overtime: meta.overtime, days: meta.workdays, hours: HOURS_PER_DAY,
                 defaultValue: '正常 {{normal}}h（{{days}} 個工作日 × {{hours}}h）＋加班 {{overtime}}h',
               })
               : task.hoursOverride != null && task.hoursOverride > 0
                 ? t('cpm.gantt.hours.manualTip', { defaultValue: '已手工填写·點擊可修改' })
-                : t('cpm.gantt.hours.tip', { days: wd, hours: HOURS_PER_DAY, defaultValue: '{{days}} 個工作日 × {{hours}}h（周末/節假日不計）· 點擊可手工填写' })}>
-              <span>{t('cpm.gantt.hours.value', { hours, defaultValue: '{{hours}}小時' })}</span>
+                : t('cpm.gantt.hours.tip', { days: meta.workdays, hours: HOURS_PER_DAY, defaultValue: '{{days}} 個工作日 × {{hours}}h（周末/節假日不計）· 點擊可手工填写' })}>
+              <span>{t('cpm.gantt.hours.value', { hours: meta.hours, defaultValue: '{{hours}}小時' })}</span>
             </Tooltip>
             {/* 加班在数字后面单独一个小标记：只有颜色变化的话，扫一眼仍会把它当成正常排期量 */}
-            {overtime > 0 && (
-              <Tooltip title={t('cpm.gantt.hours.overtimeBadge', { overtime, defaultValue: '加班 {{overtime}}h·不計入正常工時口徑' })}>
-                <span className="wg-hours-overtime">+{overtime}h</span>
+            {meta.overtime > 0 && (
+              <Tooltip title={t('cpm.gantt.hours.overtimeBadge', { overtime: meta.overtime, defaultValue: '加班 {{overtime}}h·不計入正常工時口徑' })}>
+                <span className="wg-hours-overtime">+{meta.overtime}h</span>
               </Tooltip>
             )}
             </>
@@ -1256,25 +1633,29 @@ function LeftRow({ group, task, data, hover, onHover, fresh, dropTarget, onDropT
         </div>
       </Popover>
       <Popover
-        trigger="click"
+        trigger={frozen ? [] : 'click'}
         placement="bottom"
         content={(
-          <ProgressEditor task={task} view={view} viewLabel={viewLabel} viewEnd={viewEnd} onPatch={onPatch} />
+          <ProgressEditor task={task} view={meta.view} viewLabel={viewLabel} viewEnd={viewEnd} onPatch={patch} onPreview={preview} />
         )}
       >
-        <Tooltip title={viewTip(view, viewLabel, t)}>
-          <div className="wg-c wg-c--prog" style={{ '--prog-color': color } as CSSProperties}>
+        <Tooltip title={viewTip(meta.view, viewLabel, t)}>
+          <div className="wg-c wg-c--prog" style={{ '--prog-color': meta.color } as CSSProperties}>
             <div className="wg-prog-track">
-              <div className="wg-prog-fill" style={{ width: `${view.value}%` }} />
+              <div className="wg-prog-fill" style={{ width: `${meta.view.value}%` }} />
             </div>
-            <span className="wg-prog-num">{view.value}%</span>
+            <span className="wg-prog-num">{meta.view.value}%</span>
           </div>
         </Tooltip>
       </Popover>
       <div className="wg-c wg-c--status">
         <Tooltip title={status === 'cancelled'
-          ? t('cpm.gantt.status.cancelledTip', { defaultValue: '來源會議已取消：安排保留作為事实，但不再计入待完成与工時' })
-          : t('cpm.gantt.status.deriveTip', { defaultValue: '由進度自動判定：100% 已完成；1–99% 進行中；0% 待處理；未排期為待排期' })}>
+          ? (task.cancelReason
+              ? t('cpm.gantt.status.manualCancelledTip', { reason: task.cancelReason, defaultValue: '已取消・{{reason}}：編輯已凍結，可刪除或恢復' })
+              : t('cpm.gantt.status.cancelledTip', { defaultValue: '來源會議已取消：安排保留作為事实，但不再计入待完成与工時' }))
+          : task.blocked
+            ? t('cpm.gantt.status.blockedTip', { reason: task.blockedReason ?? '', defaultValue: '阻塞中・{{reason}}：狀態標記不凍結編輯，解除後按進度恢復' })
+            : t('cpm.gantt.status.deriveTip', { defaultValue: '由進度自動判定：100% 已完成；1–99% 進行中；0% 待處理；未排期為待排期' })}>
           <Tag color={TASK_STATUS_META[status].tag} style={{ marginInlineEnd: 0 }}>{TASK_STATUS_META[status].label}</Tag>
         </Tooltip>
         {/* 回写徽标：来源是 RDM 任務的行才有值。失败必须看得见，否则用户会以为两边已经一致 */}
@@ -1294,18 +1675,46 @@ function LeftRow({ group, task, data, hover, onHover, fresh, dropTarget, onDropT
           mouseEnterDelay={0.35}
           content={<div className="wg-note-hover" dangerouslySetInnerHTML={{ __html: noteToDisplayHtml(task.note) }} />}
         >
-          <div className="wg-c wg-c--note" onClick={onEditNote}>
+          <div className="wg-c wg-c--note" onClick={frozen ? undefined : handleEditNote}>
             <span className="wg-note-text" dangerouslySetInnerHTML={{ __html: noteToDisplayHtml(task.note) }} />
           </div>
         </Popover>
       ) : (
-        <div className="wg-c wg-c--note" onClick={onEditNote}>
+        <div className="wg-c wg-c--note" onClick={frozen ? undefined : handleEditNote}>
           <span className="wg-note-text wg-note-text--empty">{t('cpm.gantt.note.clickToFill', { defaultValue: '點擊填寫' })}</span>
         </div>
       )}
+      {/* 操作列：標記類入口集中常驻（方案 B）——hover 里藏图标在冻结态会连退出入口都找不到；
+          徽标展示位置不变（仍在標題区），本列只承载入口 */}
+      <div className="wg-c wg-c--ops">
+        {frozen ? (
+          <>
+            <Tooltip title={t('cpm.gantt.cancel.restoreTip', { defaultValue: '恢復為可編輯狀態' })}>
+              <Button type="link" size="small" icon={<RollbackOutlined />} onClick={handleRestore} />
+            </Tooltip>
+            <Button type="link" size="small" danger icon={<DeleteOutlined />} onClick={handleDelete} />
+          </>
+        ) : (
+          <>
+            <Tooltip title={task.followUp ? t('cpm.gantt.follow.unmarkTip', { defaultValue: '取消跟進標記' }) : t('cpm.gantt.follow.markTip', { defaultValue: '標記為跟進工作' })}>
+              <Button type="link" size="small" icon={<FlagOutlined className={task.followUp ? 'wg-follow-on' : ''} />} onClick={handleToggleFollowUp} />
+            </Tooltip>
+            <Tooltip title={task.planType === 'inserted' ? t('cpm.gantt.insert.unmarkTip', { defaultValue: '取消臨時插入標記' }) : t('cpm.gantt.insert.markTip', { defaultValue: '標記為臨時插入' })}>
+              <Button type="link" size="small" icon={<ThunderboltOutlined />} onClick={handleToggleInserted} />
+            </Tooltip>
+            <Tooltip title={task.blocked ? t('cpm.gantt.block.unmarkTip', { defaultValue: '解除阻塞' }) : t('cpm.gantt.block.markTip', { defaultValue: '標記阻塞（需填原因）' })}>
+              <Button type="link" size="small" icon={<StopOutlined className={task.blocked ? 'wg-block-on' : ''} />} onClick={handleToggleBlock} />
+            </Tooltip>
+            <Tooltip title={t('cpm.gantt.cancel.markTip', { defaultValue: '取消任務（需填原因）' })}>
+              <Button type="link" size="small" danger icon={<CloseCircleOutlined />} onClick={handleToggleCancel} />
+            </Tooltip>
+            <Button type="link" size="small" danger icon={<DeleteOutlined />} onClick={handleDelete} />
+          </>
+        )}
+      </div>
     </div>
   )
-}
+})
 
 /** 0/25/50/75/100 快捷檔位（圖4 樣式） */
 function ProgressChips({ value, onPick }: { value: number; onPick: (p: number) => void }) {
@@ -1455,15 +1864,27 @@ function viewTip(view: PeriodProgress, viewLabel: string, t: (k: string, o?: Rec
  * 而视图里的进度条是历史落定快照、不会随之变化——不说这句，用户会把「保存成功但条不动」
  * 当成缺陷；不锁滑块，是因为浏览历史时顺手记今天的进度是正当动作，锁定会逼人多切两步筛选。
  */
-function ProgressEditor({ task, view, viewLabel, viewEnd, onPatch }: {
+function ProgressEditor({ task, view, viewLabel, viewEnd, onPatch, onPreview, disabled }: {
   task: GanttTask
   view: PeriodProgress
   viewLabel: string
   viewEnd: string | null
   onPatch: (patch: Partial<GanttTask>) => void
+  onPreview?: (patch: Partial<GanttTask>) => void
+  disabled?: boolean
 }) {
   const { t } = useTranslation()
   const current = task.progress
+  const [draft, setDraft] = useState(current)
+  useEffect(() => { setDraft(current) }, [current, task.id])
+  const previewProgress = useCallback((p: number) => {
+    setDraft(p)
+    if (!disabled) onPreview?.({ progress: p })
+  }, [disabled, onPreview])
+  const commitProgress = useCallback((p: number) => {
+    setDraft(p)
+    if (!disabled) onPatch({ progress: p })
+  }, [disabled, onPatch])
   // 最新一笔流水的日期：服务端直接回传 latestProgressAt；旧后端缺省时才从已带回的流水兜底，
   // 不在前端重算快照值/回退种类
   const latestAt = task.latestProgressAt ?? (task.history ?? []).reduce<string | null>((m, h) => (m === null || h.at > m ? h.at : m), null)
@@ -1474,7 +1895,7 @@ function ProgressEditor({ task, view, viewLabel, viewEnd, onPatch }: {
     <div className="wg-prog-pop">
       <div className="wg-prog-pop__live">
         <span>{t('cpm.gantt.progress.live', { defaultValue: '目前最新' })}</span>
-        <b style={{ color: progressColor(current) }}>{current}%</b>
+        <b style={{ color: progressColor(draft) }}>{draft}%</b>
       </div>
       {historyView && (
         <p className="wg-prog-pop__history-tip">
@@ -1483,11 +1904,13 @@ function ProgressEditor({ task, view, viewLabel, viewEnd, onPatch }: {
         </p>
       )}
       <Slider
-        value={current}
-        onChange={v => onPatch({ progress: v as number })}
+        value={draft}
+        disabled={disabled}
+        onChange={v => previewProgress(v as number)}
+        onChangeComplete={v => commitProgress(v as number)}
         marks={{ 0: '0', 50: '50', 100: '100' }}
       />
-      <ProgressChips value={current} onPick={p => onPatch({ progress: p })} />
+      <ProgressChips value={draft} onPick={commitProgress} />
       {showReview && (
         <div className="wg-snap">
           <span className="wg-snap__rail" aria-hidden />
@@ -1505,7 +1928,7 @@ function ProgressEditor({ task, view, viewLabel, viewEnd, onPatch }: {
           </div>
         </div>
       )}
-      <ProgressHistory history={task.history} current={current} viewingEnd={showReview ? viewEnd : null} />
+      <ProgressHistory history={task.history} current={draft} viewingEnd={showReview ? viewEnd : null} />
     </div>
   )
 }
@@ -1608,8 +2031,12 @@ function ProgressHistory({ history, current, viewingEnd }: { history?: { at: str
   )
 }
 
-function DateCell({ value, onCommit }: { value: string | null; onCommit: (v: string | null) => void }) {
+function DateCell({ value, onCommit, disabled }: { value: string | null; onCommit: (v: string | null) => void; disabled?: boolean }) {
   const { t } = useTranslation()
+  // 冻结态（已取消）不再渲染可点 DatePicker：留纯文本避免“能点开但改不动”的假入口
+  if (disabled) {
+    return <span className="wg-date-frozen">{value ?? t('cpm.gantt.date.schedule', { defaultValue: '排期' })}</span>
+  }
   // 單擊直接展開日期面板（borderless DatePicker 即单元格本身），不再二次點擊
   return (
     <DatePicker
@@ -1630,27 +2057,33 @@ function DateCell({ value, onCommit }: { value: string | null; onCommit: (v: str
 
 interface RightRowProps {
   group: GanttGroup
-  task: GanttTask
+  meta: TaskRenderMeta
   data: GanttData
   days: DayCell[]
   colW: number
   hover: boolean
+  top: number
+  firstRow: boolean
+  virtualized: boolean
   onHover: (id: string | null) => void
   drag: DragState | null
   onDrag: (d: DragState | null) => void
   scrollRef: RefObject<HTMLDivElement | null>
-  onPatch: (patch: Partial<GanttTask>) => void
-  onStart: (v: string | null) => void
-  onEnd: (v: string | null) => void
-  onSchedule: (key: string) => void
-  onEditNote: () => void
-  onToggleInserted: () => void
+  onPatchTask: (gid: string, tid: string, patch: Partial<GanttTask>) => void
+  onPreviewTask: (gid: string, tid: string, patch: Partial<GanttTask>) => void
+  onStartTask: (gid: string, task: GanttTask, v: string | null) => void
+  onEndTask: (gid: string, task: GanttTask, v: string | null) => void
+  onScheduleTask: (gid: string, tid: string, key: string) => void
+  onEditNote: (group: GanttGroup, task: GanttTask) => void
+  onToggleInserted: (gid: string, task: GanttTask) => void
+  onToggleFollowUp: (gid: string, task: GanttTask) => void
   viewEnd: string | null
   viewLabel: string
 }
 
-function RightRow({ group, task, data, days, colW, hover, onHover, drag, onDrag, scrollRef, onPatch, onStart, onEnd, onSchedule, onEditNote, onToggleInserted, viewEnd, viewLabel }: RightRowProps) {
+const RightRow = memo(function RightRow({ group, meta, data, days, colW, hover, top, firstRow, virtualized, onHover, drag, onDrag, scrollRef, onPatchTask, onPreviewTask, onStartTask, onEndTask, onScheduleTask, onEditNote, onToggleInserted, onToggleFollowUp, viewEnd, viewLabel }: RightRowProps) {
   const { t } = useTranslation()
+  const task = meta.task
   const startXRef = useRef(0)
   const movedRef = useRef(false)
   const [popOpen, setPopOpen] = useState(false)
@@ -1658,6 +2091,15 @@ function RightRow({ group, task, data, days, colW, hover, onHover, drag, onDrag,
   const dragging = drag !== null && drag.taskId === task.id
   const pStart = dragging ? shiftDate(drag.originStart, drag.mode === 'move' ? drag.delta : 0) : task.start
   const pEnd = dragging ? shiftDate(drag.originEnd, drag.delta) : task.end
+
+  const patch = useCallback((p: Partial<GanttTask>) => onPatchTask(group.id, task.id, p), [group.id, onPatchTask, task.id])
+  const preview = useCallback((p: Partial<GanttTask>) => onPreviewTask(group.id, task.id, p), [group.id, onPreviewTask, task.id])
+  const handleStart = useCallback((v: string | null) => onStartTask(group.id, task, v), [group.id, onStartTask, task])
+  const handleEnd = useCallback((v: string | null) => onEndTask(group.id, task, v), [group.id, onEndTask, task])
+  const handleSchedule = useCallback((key: string) => onScheduleTask(group.id, task.id, key), [group.id, onScheduleTask, task.id])
+  const handleEditNote = useCallback(() => onEditNote(group, task), [group, onEditNote, task])
+  const handleToggleInserted = useCallback(() => onToggleInserted(group.id, task), [group.id, onToggleInserted, task])
+  const handleToggleFollowUp = useCallback(() => onToggleFollowUp(group.id, task), [group.id, onToggleFollowUp, task])
 
   const span = useMemo(() => {
     if (!pStart || !pEnd) return null
@@ -1674,6 +2116,7 @@ function RightRow({ group, task, data, days, colW, hover, onHover, drag, onDrag,
   }, [days, pStart, pEnd])
 
   const beginDrag = (e: RPointerEvent<HTMLSpanElement>, mode: 'move' | 'resize') => {
+    if (task.cancelled) return
     if (!task.start || !task.end) return
     e.stopPropagation()
     e.preventDefault()
@@ -1698,6 +2141,10 @@ function RightRow({ group, task, data, days, colW, hover, onHover, drag, onDrag,
       else if (e.clientX > leftEdge && e.clientX < leftEdge + 32) el.scrollLeft -= 14
     }
   }
+  const onCommitDates = (s: string | null, e: string | null) => {
+    if (s !== null) handleStart(s)
+    if (e !== null) handleEnd(e)
+  }
   const endDrag = () => {
     if (!dragging || !drag) return
     if (drag.delta !== 0) {
@@ -1711,24 +2158,15 @@ function RightRow({ group, task, data, days, colW, hover, onHover, drag, onDrag,
     }
     onDrag(null)
   }
-  const onCommitDates = (s: string | null, e: string | null) => {
-    if (s !== null) onStart(s)
-    if (e !== null) onEnd(e)
-  }
 
-  const hours = taskHours(task, data)
-  const wd = workdayCount(task.start, task.end, data)
   const previewHours = workdayCount(pStart, pEnd, data) * HOURS_PER_DAY
-  // 色条填充/标签与左侧进度列同一服务端期末快照，避免「列 50%、色条 80%」
-  const view = periodProgressOfTask(task)
-  const color = progressColor(view.value)
   const barWidth = span ? (span.last - span.first + 1) * colW - 6 : 0
   const narrow = barWidth < 48
 
   return (
     <div
-      className={`wg-rrow${hover ? ' is-hover' : ''}`}
-      style={{ height: taskRowH(task.title) }}
+      className={`wg-rrow${hover ? ' is-hover' : ''}${firstRow ? ' wg-rrow--first' : ''}`}
+      style={{ height: meta.rowH, ...(virtualized ? { position: 'absolute', top, left: 0, right: 0 } : {}) } as CSSProperties}
       onMouseEnter={() => onHover(task.id)}
       onMouseLeave={() => onHover(null)}
     >
@@ -1738,8 +2176,9 @@ function RightRow({ group, task, data, days, colW, hover, onHover, drag, onDrag,
           className={`wg-cell${d.rest && d.weekend && !d.makeup ? ' wg-cell--rest' : ''}${d.holiday || d.compOff ? ' wg-cell--holiday' : ''}${d.leave ? ' wg-cell--leave' : ''}${d.today ? ' wg-cell--today' : ''}`}
           style={{ width: colW }}
           onDoubleClick={() => {
+            if (task.cancelled) return
             if (d.rest) { message.info(t('cpm.gantt.cell.restTip', { defaultValue: '周末/節假日不計入工時，請選擇工作日' })); return }
-            onSchedule(d.key)
+            handleSchedule(d.key)
           }}
         />
       ))}
@@ -1761,32 +2200,44 @@ function RightRow({ group, task, data, days, colW, hover, onHover, drag, onDrag,
               </div>
               <div className="wg-bar-pop__row">
                 <span>{t('cpm.gantt.pop.plan', { defaultValue: '計劃' })}</span>
-                <DatePicker size="small" value={dayjs(pStart)} onChange={d => d && onStart(fmt(d))} allowClear={false} />
+                <DatePicker size="small" value={dayjs(pStart)} onChange={d => d && handleStart(fmt(d))} allowClear={false} />
                 <i>–</i>
-                <DatePicker size="small" value={dayjs(pEnd)} onChange={d => d && onEnd(fmt(d))} allowClear={false} />
+                <DatePicker size="small" value={dayjs(pEnd)} onChange={d => d && handleEnd(fmt(d))} allowClear={false} />
               </div>
               <div className="wg-bar-pop__row">
                 <span>{t('cpm.gantt.pop.hours', { defaultValue: '耗時' })}</span>
-                <b>{hours}h</b>
-                <small>{t('cpm.gantt.pop.workdays', { days: wd, hours: HOURS_PER_DAY, defaultValue: '{{days}} 個工作日 × {{hours}}h' })}</small>
+                <b>{meta.hours}h</b>
+                <small>{t('cpm.gantt.pop.workdays', { days: meta.workdays, hours: HOURS_PER_DAY, defaultValue: '{{days}} 個工作日 × {{hours}}h' })}</small>
               </div>
               <div className="wg-bar-pop__row">
                 <span>{t('cpm.gantt.pop.planType', { defaultValue: '屬性' })}</span>
                 <Switch
                   size="small"
+                  disabled={!!task.cancelled}
                   checked={task.planType === 'inserted'}
-                  onChange={onToggleInserted}
+                  onChange={handleToggleInserted}
                   checkedChildren={t('cpm.gantt.insert.tag', { defaultValue: '臨時' })}
-                  unCheckedChildren={t('cpm.gantt.plan.planned', { defaultValue: '原計劃' })}
+                  unCheckedChildren={t('cpm.gantt.plan.planned', { defaultValue: '計劃任務' })}
                 />
                 {task.insertedAt && <small>{t('cpm.gantt.pop.insertedAt', { date: task.insertedAt, defaultValue: '{{date}} 插入' })}</small>}
               </div>
-              <ProgressEditor task={task} view={view} viewLabel={viewLabel} viewEnd={viewEnd} onPatch={onPatch} />
+              <div className="wg-bar-pop__row">
+                <span>{t('cpm.gantt.follow.label', { defaultValue: '跟進' })}</span>
+                <Switch
+                  size="small"
+                  disabled={!!task.cancelled}
+                  checked={!!task.followUp}
+                  onChange={handleToggleFollowUp}
+                  checkedChildren={t('cpm.gantt.follow.tag', { defaultValue: '跟進' })}
+                  unCheckedChildren={t('cpm.gantt.follow.none', { defaultValue: '一般' })}
+                />
+              </div>
+              <ProgressEditor task={task} view={meta.view} viewLabel={viewLabel} viewEnd={viewEnd} onPatch={patch} onPreview={preview} disabled={!!task.cancelled} />
               <div className="wg-bar-pop__row"><span>{t('cpm.gantt.pop.note', { defaultValue: '備註' })}</span></div>
               {task.note
                 ? <div className="wg-note-preview" dangerouslySetInnerHTML={{ __html: noteToDisplayHtml(task.note) }} />
                 : <p className="wg-note-empty">{t('cpm.gantt.pop.noNote', { defaultValue: '尚無備註' })}</p>}
-              <Button size="small" icon={<EditOutlined />} onClick={onEditNote} style={{ marginTop: 6 }}>{t('cpm.gantt.pop.editNote', { defaultValue: '編輯備註' })}</Button>
+              {!task.cancelled && <Button size="small" icon={<EditOutlined />} onClick={handleEditNote} style={{ marginTop: 6 }}>{t('cpm.gantt.pop.editNote', { defaultValue: '編輯備註' })}</Button>}
               <footer>{t('cpm.gantt.pop.footer', { defaultValue: '拖拽色塊移動 · 拉伸右緣改結束 · 雙擊格子排期' })}</footer>
             </div>
           )}
@@ -1796,7 +2247,7 @@ function RightRow({ group, task, data, days, colW, hover, onHover, drag, onDrag,
             style={{
               left: span.first * colW + 3,
               width: (span.last - span.first + 1) * colW - 6,
-              '--bar-color': color,
+              '--bar-color': meta.color,
             } as CSSProperties}
             onPointerDown={e => beginDrag(e, 'move')}
             onPointerMove={moveDrag}
@@ -1804,8 +2255,8 @@ function RightRow({ group, task, data, days, colW, hover, onHover, drag, onDrag,
             onPointerCancel={endDrag}
           >
             {task.planType === 'inserted' && <span className="wg-bar__flag">{t('cpm.gantt.insert.flag', { defaultValue: '插' })}</span>}
-            <span className="wg-bar__fill" style={{ width: `${view.value}%` }} />
-            {!narrow && <span className="wg-bar__chip">{view.value}%</span>}
+            <span className="wg-bar__fill" style={{ width: `${meta.view.value}%` }} />
+            {!narrow && <span className="wg-bar__chip">{meta.view.value}%</span>}
             <span
               className="wg-resize"
               onPointerDown={e => beginDrag(e, 'resize')}
@@ -1817,7 +2268,7 @@ function RightRow({ group, task, data, days, colW, hover, onHover, drag, onDrag,
         </Popover>
       )}
       {span && narrow && (
-        <span className="wg-bar__chip-out" style={{ left: (span.last + 1) * colW + 1 }}>{view.value}%</span>
+        <span className="wg-bar__chip-out" style={{ left: (span.last + 1) * colW + 1 }}>{meta.view.value}%</span>
       )}
       {dragging && pStart && pEnd && span && (
         <div className="wg-drag-tip" style={{ left: span.first * colW }}>
@@ -1826,7 +2277,7 @@ function RightRow({ group, task, data, days, colW, hover, onHover, drag, onDrag,
       )}
     </div>
   )
-}
+})
 
 /* ==================== 備註富文本彈窗 ==================== */
 

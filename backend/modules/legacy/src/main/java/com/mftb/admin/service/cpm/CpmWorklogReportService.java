@@ -113,6 +113,8 @@ public class CpmWorklogReportService {
         vo.setNotes(rows.stream().filter(r -> r.getNote() != null && !r.getNote().isBlank()).toList());
         vo.setInsertedRows(rows.stream().filter(r -> CpmConstants.PLAN_TYPE_INSERTED.equals(r.getPlanType())
                 && inRange(r.getInsertedAt() == null ? r.getStart() : r.getInsertedAt(), from, to)).toList());
+        vo.setFollowUps(rows.stream().filter(CpmWorklogDto.ReportRowVO::isFollowUp).toList());
+        vo.setBlockedRows(rows.stream().filter(CpmWorklogDto.ReportRowVO::isBlocked).toList());
         vo.setPlan(planRows(all, groups, trails, calendar, from, to, today));
 
         vo.setGroups(groupRows(rows, groups));
@@ -146,6 +148,10 @@ public class CpmWorklogReportService {
                 ? (int) ChronoUnit.DAYS.between(item.getPlanEnd(), today) : 0);
         row.setPlanType(item.getPlanType() == null ? CpmConstants.PLAN_TYPE_PLANNED : item.getPlanType());
         row.setInsertedAt(item.getInsertedAt() == null ? null : item.getInsertedAt().toString());
+        row.setFollowUp(item.getFollowUp() != null && item.getFollowUp() == 1);
+        row.setBlocked(item.getBlocked() != null && item.getBlocked() == 1);
+        row.setBlockedReason(item.getBlockedReason());
+        row.setCancelReason(item.getCancelReason());
         row.setNote(item.getNoteText() == null ? "" : item.getNoteText());
         row.setState(stateOf(item));
         return row;
@@ -187,6 +193,9 @@ public class CpmWorklogReportService {
         int periodLen = (int) ChronoUnit.DAYS.between(from, to) + 1;
         List<CpmWorklogDto.ReportRowVO> plan = new ArrayList<>();
         for (CpmItem item : all) {
+            if (CpmConstants.STATUS_CANCELLED.equals(item.getStatus())) {
+                continue;
+            }
             if (item.getPlanStart() == null || !item.getPlanStart().isAfter(to)) {
                 continue;
             }
@@ -305,6 +314,9 @@ public class CpmWorklogReportService {
         t.setDoing((int) rows.stream().filter(r -> r.getPEnd() > 0 && r.getPEnd() < 100).count());
         t.setPending((int) rows.stream().filter(r -> r.getPEnd() == 0).count());
         t.setInserted(vo.getInsertedRows().size());
+        t.setFollowUpCount(vo.getFollowUps().size());
+        t.setFollowUpAvg(round(vo.getFollowUps().stream().mapToInt(CpmWorklogDto.ReportRowVO::getPEnd).average().orElse(0)));
+        t.setBlockedCount(vo.getBlockedRows().size());
         t.setRisks(vo.getRisks().size());
         t.setBacklog(backlog);
         t.setHours(rows.stream().mapToInt(CpmWorklogDto.ReportRowVO::getHours).sum());

@@ -73,6 +73,13 @@ public final class CpmWorklogDto {
         private String planType;
         /** 标记为临时插入的日期；原计划为 null */
         private String insertedAt;
+        /** 跟进工作：与 planType 正交的独立标记 */
+        private boolean followUp;
+        /** 阻塞：只作标记，不冻结编辑 */
+        private boolean blocked;
+        private String blockedReason;
+        /** 人工取消原因；会议来源取消为空 */
+        private String cancelReason;
         /** 整段总工时（工作日 × 8h），服务端算；有手工覆盖时等于覆盖值 */
         private int hours;
         /**
@@ -140,6 +147,11 @@ public final class CpmWorklogDto {
         /** 来源已取消：单独成数，不进 done/doing/pending 任何一个，也不计入总工时 */
         private int cancelled;
         private int inserted;
+        /** 本期跟进工作项数与平均进度（与 planType 正交） */
+        private int followUpCount;
+        private int followUpAvg;
+        /** 本期阻塞项数：仍在正常汇报聚合内，只作醒目标记 */
+        private int blockedCount;
         private int backlog;
         private int risks;
         private int hours;
@@ -179,6 +191,16 @@ public final class CpmWorklogDto {
         private String planType;
         /** 标记日期；planType=inserted 且留空时服务端取今天 */
         private String insertedAt;
+        /** 跟进标记；null=不改动，服务端布尔归一 */
+        private Boolean followUp;
+        /** 阻塞标记；true 时 blockedReason 服务端必填非空 */
+        private Boolean blocked;
+        @Size(max = 200)
+        private String blockedReason;
+        /** 人工取消；true 时 cancelReason 服务端必填非空；已取消行除恢复接口外拒写 */
+        private Boolean cancelled;
+        @Size(max = 200)
+        private String cancelReason;
         /** 岗位词表分类，缺省 general */
         @Size(max = 32)
         private String category;
@@ -287,6 +309,10 @@ public final class CpmWorklogDto {
         private int overdueDays;
         private String planType;
         private String insertedAt;
+        private boolean followUp;
+        private boolean blocked;
+        private String blockedReason;
+        private String cancelReason;
         private String note;
         private String state;
     }
@@ -333,6 +359,8 @@ public final class CpmWorklogDto {
         private List<ReportRowVO> notes = new ArrayList<>();
         private List<ReportRowVO> plan = new ArrayList<>();
         private List<ReportRowVO> insertedRows = new ArrayList<>();
+        private List<ReportRowVO> followUps = new ArrayList<>();
+        private List<ReportRowVO> blockedRows = new ArrayList<>();
         private List<ReportDayVO> daily = new ArrayList<>();
         private ReportDayVO peak;
     }

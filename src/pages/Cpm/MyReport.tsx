@@ -10,8 +10,8 @@ import { useTranslation } from 'react-i18next'
 import { Alert, Button, DatePicker, Dropdown, Empty, Input, Segmented, Tabs, Tag, Tooltip, message, type MenuProps } from 'antd'
 import {
   CheckCircleOutlined, CopyOutlined, DownloadOutlined, EditOutlined, FileImageOutlined,
-  FilePdfOutlined, LeftOutlined, RightOutlined, RiseOutlined, FallOutlined,
-  WarningOutlined, TrophyFilled, FieldTimeOutlined, ThunderboltOutlined,
+  FilePdfOutlined, FlagOutlined, LeftOutlined, RightOutlined, RiseOutlined, FallOutlined,
+  WarningOutlined, TrophyFilled, FieldTimeOutlined, StopOutlined, ThunderboltOutlined,
 } from '@ant-design/icons'
 import dayjs, { type Dayjs } from 'dayjs'
 import isoWeek from 'dayjs/plugin/isoWeek'
@@ -264,7 +264,9 @@ export default function MyReport() {
                       {/* 风险与临时插入不再各占一节，缩成概览行内标记：读的人先看到量，再去看明细 */}
                       <div className="rp-flags">
                         <span className="rp-flag"><WarningOutlined />{t('cpm.workReport.stat.risks', { defaultValue: '風險事項' })} <b>{report.totals.risks}</b></span>
-                        <span className="rp-flag"><ThunderboltOutlined />{t('cpm.gantt.plan.inserted', { defaultValue: '臨時插入' })} <b>{report.totals.inserted}</b></span>
+                        <span className="rp-flag"><ThunderboltOutlined />{t('cpm.gantt.plan.inserted', { defaultValue: '臨時任務' })} <b>{report.totals.inserted}</b></span>
+                        <span className="rp-flag"><FlagOutlined />{t('cpm.workReport.stat.follow', { defaultValue: '跟進工作' })} <b>{report.totals.followUpCount ?? 0}</b></span>
+                        <span className="rp-flag"><StopOutlined />{t('cpm.gantt.block.tag', { defaultValue: '阻塞' })} <b>{report.totals.blockedCount ?? 0}</b></span>
                         <span className="rp-flag">{t('cpm.gantt.status.plan', { defaultValue: '待排期' })} <b>{report.totals.backlog}</b></span>
                         <span className="rp-flag">{t('cpm.workReport.covered', { defaultValue: '本期覆蓋' })} <b>{report.totals.total}</b></span>
                       </div>
@@ -277,6 +279,7 @@ export default function MyReport() {
                       ) : (
                         <>
                           {report.groups.map(g => <GroupBlock key={g.group.id} g={g} />)}
+                          {(report.followUps?.length ?? 0) > 0 && <FollowBlock rows={report.followUps ?? []} />}
                           <DailySpark report={report} />
                         </>
                       )}
@@ -442,6 +445,14 @@ function GroupBlock({ g }: { g: ReportGroupRow }) {
                 <Tag color="volcano" className="wg-insert-tag">{t('cpm.gantt.insert.tag', { defaultValue: '臨時' })}</Tag>
               </Tooltip>
             )}
+            {r.task.followUp && (
+              <Tag color="gold" className="wg-follow-tag">{t('cpm.gantt.follow.tag', { defaultValue: '跟進' })}</Tag>
+            )}
+            {r.task.blocked && (
+              <Tooltip title={t('cpm.gantt.block.tagTip', { reason: r.task.blockedReason ?? '', defaultValue: '阻塞中・{{reason}}' })}>
+                <Tag color="red" className="wg-block-tag">{t('cpm.gantt.block.tag', { defaultValue: '阻塞' })}</Tag>
+              </Tooltip>
+            )}
             <span className="rp-cmp__pill" style={{ '--p': progressColor(r.pEnd) } as CSSProperties}>
               <i style={{ width: `${r.pEnd}%` }} />
             </span>
@@ -455,6 +466,35 @@ function GroupBlock({ g }: { g: ReportGroupRow }) {
           </div>
         ))}
       </div>
+    </div>
+  )
+}
+
+/**
+ * 跟進工作小节：与 planType 正交的独立标记维度，只收本期覆盖且被标跟進的行。
+ * 汇总行给「本期跟進 N 項 · 平均進度 X%」，每条行给当前进度——周会过跟进盘点时一句一条。
+ */
+function FollowBlock({ rows }: { rows: ReportGroupRow['rows'] }) {
+  const { t } = useTranslation()
+  const avg = rows.length ? Math.round(rows.reduce((sum, r) => sum + r.pEnd, 0) / rows.length) : 0
+  return (
+    <div className="rp-follow">
+      <div className="rp-follow__head">
+        <FlagOutlined />
+        <b>{t('cpm.workReport.follow.title', { defaultValue: '跟進工作' })}</b>
+        <span>{t('cpm.workReport.follow.summary', { count: rows.length, avg, defaultValue: '本期跟進 {{count}} 項 · 平均進度 {{avg}}%' })}</span>
+      </div>
+      {rows.map(r => (
+        <div key={r.task.id} className="rp-follow__row">
+          <span className="rp-follow__title">{r.task.title}</span>
+          <span className="rp-follow__group">{r.group.title}</span>
+          <span className="rp-cmp__pill" style={{ '--p': progressColor(r.pEnd) } as CSSProperties}>
+            <i style={{ width: `${r.pEnd}%` }} />
+          </span>
+          <b className="rp-follow__num">{r.pEnd}%</b>
+          {r.task.planType === 'inserted' && <Tag color="volcano" className="wg-insert-tag">{t('cpm.gantt.insert.tag', { defaultValue: '臨時' })}</Tag>}
+        </div>
+      ))}
     </div>
   )
 }

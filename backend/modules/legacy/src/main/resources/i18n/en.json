@@ -18334,7 +18334,8 @@
         "start": "Start date",
         "task": "Subtask",
         "progressEnd": "Progress ({{name}} end)",
-        "progressEndTip": "Shows the value recorded by the end of the selected period. If nothing changed in the period, the last earlier value is kept; if there was no record yet, it shows 0%. Click the progress cell to update the current value."
+        "progressEndTip": "Shows the value recorded by the end of the selected period. If nothing changed in the period, the last earlier value is kept; if there was no record yet, it shows 0%. Click the progress cell to update the current value.",
+        "ops": "Actions"
       },
       "confirm": {
         "deleteItemTitle": "Delete this whole work item?",
@@ -18424,7 +18425,14 @@
         "planRestored": "Restored to the original plan",
         "sheetNotReady": "The ledger is not loaded yet",
         "taskDeleted": "Subtask deleted.",
-        "syncFailed": "Save failed, please retry"
+        "syncFailed": "Save failed, please retry",
+        "followMarked": "Marked as follow-up work",
+        "followCleared": "Follow-up mark removed",
+        "blockCleared": "Unblocked; task status restored from progress",
+        "restored": "Restored; task is editable",
+        "reasonRequired": "Reason is required",
+        "blocked": "Marked as blocked; progress and notes remain editable",
+        "cancelled": "Task cancelled; editing frozen. Only delete or restore is available."
       },
       "newItemTitle": "New work item",
       "note": {
@@ -18465,8 +18473,11 @@
         "prev": "Previous period"
       },
       "plan": {
-        "inserted": "Ad-hoc insertion",
-        "planned": "Original plan"
+        "inserted": "Ad-hoc task",
+        "planned": "Planned task",
+        "caliberTitle": "Plan attribute filter semantics",
+        "caliber": "Planned and ad-hoc tasks are mutually exclusive; follow-up is an independent dimension. A task can be both ad-hoc and follow-up, so it appears in either filtered view. Each view filters exactly by the selected attribute.",
+        "follow": "Follow-up task"
       },
       "pop": {
         "editNote": "Edit note",
@@ -18518,7 +18529,7 @@
         "doneTip": "Completion date falls in the queried range (same basis as the report)",
         "hours": "Total hours (workday basis)",
         "hoursTip": "Workdays in the range intersection × 8h",
-        "insertedAllTip": "All work items marked as ad-hoc insertions",
+        "insertedAllTip": "All tasks marked as ad-hoc",
         "insertedTip": "Insertion date falls in the queried range",
         "pendingNow": "To finish",
         "pendingNowTip": "Current status is pending or unscheduled",
@@ -18531,12 +18542,19 @@
         "deriveTip": "Derived from progress: 100% done; 1–99% in progress; 0% pending; unscheduled stays unscheduled",
         "plan": "Unscheduled",
         "todo": "Pending",
-        "cancelledTip": "The source meeting was cancelled: the plan is kept as a fact, but it no longer counts as pending or as hours"
+        "cancelledTip": "The source meeting was cancelled: the plan is kept as a fact, but it no longer counts as pending or as hours",
+        "manualCancelledTip": "Cancelled · {{reason}}: editing frozen; delete or restore only",
+        "blockedTip": "Blocked · {{reason}}: marker does not freeze editing; unblock to restore progress-derived status"
       },
       "subtaskN": "Subtask {{count}}",
       "suffix": {
         "item": " items",
         "percent": "%"
+      },
+      "list": {
+        "end": "All {{count}} subtasks shown",
+        "atEnd": "End of list · {{count}} items",
+        "more": "Scroll down for more"
       },
       "tabbar": {
         "summary": "{{tasks}} subtasks · {{workdays}} workdays",
@@ -18593,6 +18611,49 @@
         "desc": "This task has no schedule yet, so the current-period filter does not show it. Switch to \"All\" to rename and schedule it.",
         "ok": "Switch to \"All\"",
         "withSubtask": "{{title}} (with subtask 1)"
+      },
+      "block": {
+        "unmarkTitle": "Unblock this task?",
+        "reasonLabel": "Block reason:",
+        "unmarkOk": "Unblock",
+        "hint": "Blocking is a status marker only: progress, notes and schedule remain editable. The reason appears in the block badge tooltip.",
+        "placeholder": "Enter a block reason (required)",
+        "tag": "Blocked",
+        "unmarkTip": "Unblock",
+        "markTip": "Mark as blocked (reason required)",
+        "tagTip": "Blocked · {{reason}}",
+        "modalTitle": "Mark as blocked · {{title}}"
+      },
+      "cancel": {
+        "restoreTitle": "Restore this task to editable state?",
+        "reasonLabel": "Cancellation reason:",
+        "meetingSource": "Source meeting cancelled",
+        "restoreOk": "Restore",
+        "hint": "Cancelling freezes all editing (title/progress/schedule/notes/marks); only Delete and Restore remain.",
+        "placeholder": "Enter a cancellation reason (required)",
+        "restoreTip": "Restore to editable state",
+        "markTip": "Cancel task (reason required)",
+        "modalTitle": "Cancel task · {{title}}"
+      },
+      "follow": {
+        "tagTip": "Follow-up work · requires ongoing tracking",
+        "tag": "Follow-up",
+        "unmarkTip": "Remove follow-up mark",
+        "markTip": "Mark as follow-up work",
+        "label": "Follow-up",
+        "none": "Normal"
+      },
+      "crossweek": {
+        "tag": "Cross-week",
+        "tagTip": "Cross-week task · {{start}} ~ {{end}} spans different weeks (Monday-start), appears in multiple weekly reports"
+      },
+      "overdue": {
+        "tag": "Overdue",
+        "tagTip": "Overdue {{days}} days · ended {{end}} and still incomplete"
+      },
+      "stalled": {
+        "tag": "Stalled",
+        "tagTip": "No progress update for {{days}} days (threshold {{threshold}} days)"
       }
     },
     "holiday": {
@@ -18721,7 +18782,9 @@
         "backlogItem": "- [Unscheduled] {{count}} items have no schedule and bill no hours",
         "groupTitleOt": "### {{title}} ({{count}} items · {{hours}}h, including {{overtime}}h overtime)",
         "overtime": "- Overtime {{overtime}}h (regular {{normal}}h)",
-        "overtimeMark": " (includes {{overtime}}h overtime)"
+        "overtimeMark": " (includes {{overtime}}h overtime)",
+        "followMark": "[Follow-up]",
+        "followLine": "- {{count}} follow-up items this period · average progress {{avg}}%"
       },
       "outputs": {
         "none": "Nothing completed this period — see the next section for in-flight work."
@@ -18734,7 +18797,8 @@
         "progress": "Average progress {{from}}% → {{to}}% ({{delta}}%)",
         "risks": "{{count}} overdue items need attention",
         "sep": ", ",
-        "overtime": "including {{overtime}}h overtime (regular {{normal}}h)"
+        "overtime": "including {{overtime}}h overtime (regular {{normal}}h)",
+        "follow": "{{count}} follow-up items (average {{avg}}%)"
       },
       "overdueDays": "Overdue {{days}} days",
       "overdueShort": "Overdue {{days}}d",
@@ -18765,7 +18829,8 @@
         "hours": "Hours invested",
         "risks": "Risk items",
         "overtime": "Includes {{overtime}}h overtime",
-        "overtimeTip": "Regular {{normal}}h + overtime {{overtime}}h; derived by the server from intersecting workdays, not stored as a separate field"
+        "overtimeTip": "Regular {{normal}}h + overtime {{overtime}}h; derived by the server from intersecting workdays, not stored as a separate field",
+        "follow": "Follow-up work"
       },
       "summaryPlaceholder": "Write one line as the period summary (leave empty to use the auto overview, same text on export)",
       "tab": {
@@ -18779,7 +18844,11 @@
       "covered": "Covered",
       "loadFailed": "Failed to load the report",
       "loading": "Aggregating the report…",
-      "groupOvertime": "includes {{overtime}}h overtime"
+      "groupOvertime": "includes {{overtime}}h overtime",
+      "follow": {
+        "title": "Follow-up work",
+        "summary": "{{count}} follow-up items this period · average progress {{avg}}%"
+      }
     },
     "meetingImport": {
       "button": "Import Meetings",

@@ -20,7 +20,7 @@ import { fmt, mondayOf, type GanttData } from './worklogGanttModel'
  *
  * 钉的是几轮迭代确认下来的形态，不是像素：
  * ①统计卡必须在搜索区下方（§E.8）；②列表态隐藏甘特专属控件；
- * ③「完成」列已改名「狀態」且与筛选词同源；④計劃屬性可单独筛临时插入；
+ * ③「完成」列已改名「狀態」且与筛选词同源；④計劃屬性可单独筛临时任务；
  * ⑤节假日配置入口在功能区（它已升为独立菜单）。
  *
  * 台账已改成服务端唯一真源，所以整层 API 在此换成内存夹具：本文件验的是
@@ -68,7 +68,7 @@ const FIXTURE: GanttData = {
     {
       id: 'g2', title: '無敵星星廣告', hue: 2,
       tasks: [
-        { id: 't3', title: '銷售定價-門店', start: d(0), end: d(2), progress: 90, note: '定價待複核', planType: 'inserted', insertedAt: d(0), history: [{ at: d(0), progress: 0 }, { at: d(1), progress: 90 }] },
+        { id: 't3', title: '銷售定價-門店', start: d(0), end: d(2), progress: 90, note: '定價待複核', planType: 'inserted', insertedAt: d(0), followUp: true, history: [{ at: d(0), progress: 0 }, { at: d(1), progress: 90 }] },
         { id: 't5', title: '廣告銷售-商品購買', start: d(1), end: d(3), progress: 30, note: '', history: [{ at: d(1), progress: 0 }, { at: d(2), progress: 30 }] },
         { id: 't4', title: '商家PC端', start: null, end: null, progress: 0, note: '' },
       ],
@@ -121,7 +121,7 @@ describe('统一工作记录视图', () => {
   it('默认落在本週档：只显示与本周相交的任务，未排期不进本期', async () => {
     const { container } = mount()
     await screen.findByText('銷售定價-門店')
-    const rows = [...container.querySelectorAll('.wg-left .wg-row__ops')]
+    const rows = [...container.querySelectorAll('.wg-left .wg-c--ops')]
     // 3 行 = g2 的 t3/t5（本周相交）+ 虚拟分组的 t9；未排期/上周任务不进本期
     expect(container.querySelectorAll('.wg-left .wg-row')).toHaveLength(3)
     expect(rows).toHaveLength(3)
@@ -129,7 +129,7 @@ describe('统一工作记录视图', () => {
     expect(screen.getByText(/第\s*\d+\s*週（/)).toBeTruthy()
   })
 
-  it('切「全部」后未排期任务回来，计划属性可单独筛出临时插入', async () => {
+  it('切「全部」后未排期任务回来，计划属性可单独筛出临时任务', async () => {
     const user = userEvent.setup()
     const { container } = mount()
     await screen.findByText('銷售定價-門店')
@@ -142,15 +142,29 @@ describe('统一工作记录视图', () => {
 
     // 标签与控件在同一个 .ant-form-item 下（不是父子关系），用 closest 取行容器
     const planItem = screen.getByText('計劃屬性').closest('.ant-form-item')!
-    // 「臨時插入」同时出现在统计卡标签、图例与下拉选项里，只认下拉的那一项
+    // 「臨時任務」同时出现在统计卡标签、图例与下拉选项里，只认下拉的那一项
     // antd v5 的 Select 靠 mousedown 在 .ant-select-selector 上弹层（仓内先例同形）；
     // 选项文本用 .ant-select-item-option-content 锁定，避开统计卡与图例上的同名词
     fireEvent.mouseDown(planItem.querySelector('.ant-select-selector')!)
-    fireEvent.click(await screen.findByText('臨時插入', { selector: '.ant-select-item-option-content' }))
+    fireEvent.click(await screen.findByText('臨時任務', { selector: '.ant-select-item-option-content' }))
     await user.click(screen.getByRole('button', { name: /查.*詢/ }))
     expect(await screen.findByText('銷售定價-門店')).toBeTruthy()
     expect(screen.queryByText('商家PC端')).toBeNull()
     expect(container.querySelectorAll('.wg-left .wg-row')).toHaveLength(1)
+  })
+
+  it('跟進任务是独立维度：臨時+跟進的行在跟進档也能筛出', async () => {
+    const user = userEvent.setup()
+    mount()
+    await screen.findByText('銷售定價-門店')
+    await user.click(screen.getByText('全部'))
+    const planItem = screen.getByText('計劃屬性').closest('.ant-form-item')!
+    fireEvent.mouseDown(planItem.querySelector('.ant-select-selector')!)
+    fireEvent.click(await screen.findByText('跟進任務', { selector: '.ant-select-item-option-content' }))
+    await user.click(screen.getByRole('button', { name: /查.*詢/ }))
+    expect(await screen.findByText('銷售定價-門店')).toBeTruthy()
+    expect(screen.queryByText('廣告銷售-商品購買')).toBeNull()
+    expect(screen.queryByText('商家PC端')).toBeNull()
   })
 
   it('列表态隐藏甘特专属控件，甘特态才出现', async () => {
@@ -200,5 +214,30 @@ describe('统一工作记录视图', () => {
     const ledgerApi = await import('./worklogApi')
     await user.click(virtualReq.querySelector('.wg-req__ops .anticon-plus')!.closest('button')!)
     await waitFor(() => expect((ledgerApi.createTask as ReturnType<typeof vi.fn>).mock.calls.at(-1)?.[0].groupId).toBe(0))
+  })
+
+  it('超过 60 条时只挂载窗口行，并给出全部结束反馈', async () => {
+    const ledgerApi = await import('./worklogApi')
+    const fetchMock = ledgerApi.fetchLedger as ReturnType<typeof vi.fn>
+    const original = fetchMock.getMockImplementation()
+    const large: GanttData = {
+      groups: [{
+        id: 'large', title: '大量工作項', hue: 0,
+        tasks: Array.from({ length: 61 }, (_, i) => ({
+          id: `lt${i}`, title: `大量任務${i}`, start: d(0), end: d(1), progress: 0, note: '',
+        })),
+      }],
+      holidays: [], makeup: [], compOff: [], leave: [],
+    }
+    fetchMock.mockResolvedValue({ data: large, rangeStart: null, rangeEnd: null, hasUngrouped: false })
+    try {
+      const { container } = mount()
+      await screen.findByText('大量任務0')
+      expect(container.querySelectorAll('.wg-left .wg-row').length).toBeLessThan(61)
+      expect(screen.getByText('已顯示全部 61 個子任務')).toBeTruthy()
+      expect(screen.getByText('已到底 · 共 61 項')).toBeTruthy()
+    } finally {
+      if (original) fetchMock.mockImplementation(original)
+    }
   })
 })

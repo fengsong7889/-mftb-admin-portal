@@ -9,8 +9,8 @@ import { beforeAll, describe, expect, it } from 'vitest'
 import dayjs from 'dayjs'
 import i18n from '@/i18n'
 import {
-  HOURS_PER_DAY, buildRange, dayBadge, dayType, fmt, hoursInPeriod, isRestDay, loadData,
-  mondayOf, overlaps, progressColor, setDayType, taskHours, taskStatus, weekName, weekdayShort, workdayCount,
+  HOURS_PER_DAY, STALL_DAYS, buildRange, crossesWeek, dayBadge, dayType, fmt, hoursInPeriod, isRestDay, loadData,
+  mondayOf, overdueDaysOf, overlaps, progressColor, setDayType, stalledDaysOf, taskHours, taskRowH, taskStatus, weekName, weekdayShort, workdayCount,
   TASK_STATUS_META,
   type GanttData,
 } from './worklogGanttModel'
@@ -29,6 +29,38 @@ const SUN = '2026-11-22'
 
 beforeAll(async () => {
   await i18n.changeLanguage('zh-TW')
+})
+
+describe('时间派生标签与行高', () => {
+  it('跨周按周一起算：跨周 true、同周/未排期 false', () => {
+    const monday = mondayOf(dayjs())
+    expect(crossesWeek(fmt(monday), fmt(monday.add(7, 'day')))).toBe(true)
+    expect(crossesWeek(fmt(monday), fmt(monday.add(2, 'day')))).toBe(false)
+    expect(crossesWeek(null, fmt(monday))).toBe(false)
+  })
+
+  it('逾期只算已结束且未完成/未取消的任务', () => {
+    const end = fmt(dayjs().subtract(2, 'day'))
+    const base = { id: 't', title: 'x', start: end, end, progress: 50, note: '' }
+    expect(overdueDaysOf(base)).toBe(2)
+    expect(overdueDaysOf({ ...base, progress: 100 })).toBe(0)
+    expect(overdueDaysOf({ ...base, cancelled: true })).toBe(0)
+  })
+
+  it('停滯按最近流水与阈值 7 天判定，旧数据从 history 兜底', () => {
+    const old = fmt(dayjs().subtract(STALL_DAYS + 1, 'day'))
+    const base = { id: 't', title: 'x', start: null, end: null, progress: 50, note: '' }
+    expect(stalledDaysOf({ ...base, latestProgressAt: old })).toBe(STALL_DAYS + 1)
+    expect(stalledDaysOf({ ...base, history: [{ at: old, progress: 50 }] })).toBe(STALL_DAYS + 1)
+    expect(stalledDaysOf({ ...base, latestProgressAt: fmt(dayjs()) })).toBe(0)
+    expect(stalledDaysOf({ ...base, progress: 0, latestProgressAt: old })).toBe(0)
+  })
+
+  it('行高按标题行数与徽标子行数累加，两侧同步函数不随筛选变化', () => {
+    expect(taskRowH('短标题', 0)).toBe(44)
+    expect(taskRowH('短标题', 2)).toBeGreaterThan(taskRowH('短标题', 0))
+    expect(taskRowH('很长的任务标题'.repeat(20), 2)).toBeGreaterThan(taskRowH('短标题', 2))
+  })
 })
 
 describe('工作日口径', () => {

@@ -132,6 +132,15 @@ public class CpmWorklogController {
         return Result.success("已恢復", null);
     }
 
+    /** 恢复取消态：与软删 restore 分开，清 cancelled/cancel_reason，status 按进度重算。 */
+    @PostMapping("/tasks/{id}/restore-state")
+    @RequirePermission(menu = MY, action = EDIT)
+    public Result<CpmWorklogDto.TaskVO> restoreState(@PathVariable("id") long id,
+                                                     HttpServletResponse response) {
+        noStore(response);
+        return Result.success("已恢復", worklogService.restoreState(id));
+    }
+
     /* ==================== 工时口径日历 ==================== */
 
     @GetMapping("/calendar")

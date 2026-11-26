@@ -80,11 +80,14 @@ public class CpmSchemaMigrationInitializer implements CommandLineRunner {
      * 存量环境不会重跑，新取值永远进不了 CHECK——界面导得出、写库报错。
      */
     static final String VERSION_SOURCE_MEETING = "cpm:schema:v1.4";
+    /** 台账标记维度：跟进/阻塞/原因列；取消复用 status=cancelled，不扩枚举 */
+    static final String VERSION_WORKLOG_MARKS = "cpm:schema:v1.5";
 
     private static final String SCHEMA_SCRIPT = "336_cpm_core.sql";
     private static final String TIME_SCHEMA_SCRIPT = "337_cpm_time_schema.sql";
     private static final String REVISION_SCHEMA_SCRIPT = "338_cpm_report_revision.sql";
     private static final String WORKLOG_SCHEMA_SCRIPT = "344_cpm_worklog_ledger.sql";
+    private static final String WORKLOG_MARKS_SCHEMA_SCRIPT = "346_cpm_worklog_marks.sql";
 
     private static final String SYSTEM_CODE = SystemCode.CPM.code();
     private static final String ADMIN_ROLE_CODE = "admin";
@@ -170,6 +173,7 @@ public class CpmSchemaMigrationInitializer implements CommandLineRunner {
         versionTracker.applyOnce(VERSION_WORKLOG_SCHEMA, this::doWorklogSchema, this::verifyWorklogSchema);
         versionTracker.applyOnce(VERSION_CALENDAR_SEED, this::doCalendarSeed, this::verifyCalendarSeed);
         versionTracker.applyOnce(VERSION_SOURCE_MEETING, this::doSourceMeetingExpand, this::verifySourceMeetingExpand);
+        versionTracker.applyOnce(VERSION_WORKLOG_MARKS, this::doWorklogMarksSchema, this::verifyWorklogMarksSchema);
         syncMenuVisibility();
     }
 
@@ -631,6 +635,15 @@ public class CpmSchemaMigrationInitializer implements CommandLineRunner {
             {"biz_cpm_item", "note_text"},
     };
 
+    /** v1.5 标记列独立校验：不并进 v1.3 的 WORKLOG_ITEM_COLUMNS——
+     * 否则老库已记 v1.3 时会在 v1.5 补列前先被 v1.3 的 verify 卡住。 */
+    private static final String[][] WORKLOG_MARKS_COLUMNS = {
+            {"biz_cpm_item", "follow_up"},
+            {"biz_cpm_item", "blocked"},
+            {"biz_cpm_item", "blocked_reason"},
+            {"biz_cpm_item", "cancel_reason"},
+    };
+
     /**
      * 全局法定名单种子（user_id=0）。
      *
@@ -706,6 +719,28 @@ public class CpmSchemaMigrationInitializer implements CommandLineRunner {
         for (String[] col : WORKLOG_ITEM_COLUMNS) {
             if (!columnExists(col[0], col[1])) {
                 throw new IllegalStateException(col[0] + "." + col[1] + " 列缺失，台账排期与计划属性无处落值");
+            }
+        }
+    }
+
+    /** v1.5：四个标记列一次性加齐；脚本只作参考，真正幂等靠 addColumnIfAbsent。 */
+    private void doWorklogMarksSchema() {
+        int executed = executeScript(WORKLOG_MARKS_SCHEMA_SCRIPT);
+        log.info("持續績效台账标记列脚本已执行: {} 条语句（{}）", executed, WORKLOG_MARKS_SCHEMA_SCRIPT);
+        addColumnIfAbsent("biz_cpm_item", "follow_up",
+                "ALTER TABLE biz_cpm_item ADD COLUMN follow_up TINYINT NOT NULL DEFAULT 0 COMMENT '1=跟进工作（与 planType 正交的独立维度）'");
+        addColumnIfAbsent("biz_cpm_item", "blocked",
+                "ALTER TABLE biz_cpm_item ADD COLUMN blocked TINYINT NOT NULL DEFAULT 0 COMMENT '1=阻塞（只作标记，不冻结进度/备注/排期编辑）'");
+        addColumnIfAbsent("biz_cpm_item", "blocked_reason",
+                "ALTER TABLE biz_cpm_item ADD COLUMN blocked_reason VARCHAR(200) NULL COMMENT '阻塞原因（服务端必填校验，解除时清空）'");
+        addColumnIfAbsent("biz_cpm_item", "cancel_reason",
+                "ALTER TABLE biz_cpm_item ADD COLUMN cancel_reason VARCHAR(200) NULL COMMENT '人工取消原因（会议来源取消为空，由 source_type 区分）'");
+    }
+
+    private void verifyWorklogMarksSchema() {
+        for (String[] col : WORKLOG_MARKS_COLUMNS) {
+            if (!columnExists(col[0], col[1])) {
+                throw new IllegalStateException(col[0] + "." + col[1] + " 列缺失，跟进/阻塞/取消标记无处落值");
             }
         }
     }

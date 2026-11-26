@@ -149,6 +149,20 @@ public class CpmItem {
     /** 备注纯文本降级：搜索、Markdown 导出、CSV 用它，保证「导出文本 = 页面文本」 */
     private String noteText;
 
+    /* ---------- 台账标记（cpm:schema:v1.5）：跟进/阻塞/取消原因 ---------- */
+
+    /** 1=跟进工作：与 planType 正交的独立维度，可「臨時+跟進」并存 */
+    private Integer followUp;
+
+    /** 1=阻塞：只作标记，不冻结进度/备注/排期编辑；不能占用 status（会被进度重算冲掉） */
+    private Integer blocked;
+
+    /** 阻塞原因：服务端必填非空，解除时清空 */
+    private String blockedReason;
+
+    /** 人工取消原因；会议来源取消为空，由 source_type 区分来源 */
+    private String cancelReason;
+
     /** 乐观锁：并发双端更新只有一边能赢 */
     private Integer version;
 

@@ -6,7 +6,7 @@
  * 完整许可条款见仓库根目录 LICENSE 文件。
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { I18nextProvider } from 'react-i18next'
@@ -329,7 +329,7 @@ describe('P1 我的工作記錄（台账单一视图·真实契约）', () => {
     const { container } = mount(<MemoryRouter><WorklogGantt /></MemoryRouter>)
     await screen.findByText('已完成的事')
     // 锁行内那颗删除图标按钮：功能区/弹层里都可能出现其他 delete 图标，按名字取第一个会误命中
-    await user.click(container.querySelector('.wg-row__ops .anticon-delete')!.closest('button')!)
+    await user.click(container.querySelector('.wg-c--ops .anticon-delete')!.closest('button')!)
     expect((await screen.findAllByText('確定刪除該子任務？')).length).toBeGreaterThan(0)
     await user.click(screen.getByRole('button', { name: /確\s*認\s*刪\s*除/ }))
     await waitFor(() => expect(ledgerApi.deleteTask).toHaveBeenCalledWith(1))
@@ -448,6 +448,28 @@ describe('P1 我的工作記錄（台账单一视图·真实契约）', () => {
     await waitFor(() => expect(popover.querySelector('.wg-prog-pop__live b')?.textContent).toBe('80%'), { timeout: 8000 })
     expect(within(popover).getByText('往期快照')).toBeTruthy()
     expect(popover.querySelector('.wg-snap__value b')?.textContent).toBe('50%')
+  }, 30000)
+
+  it('进度滑块只在释放时提交一次，避免拖动期间连续写库', async () => {
+    const user = userEvent.setup()
+    ledgerStub.current = ledgerWith(ledgerRow({
+      progress: 80,
+      periodProgress: 80,
+      periodProgressKind: 'live',
+      latestProgressAt: today,
+      history: [{ at: today, progress: 80 }],
+    }))
+    const { container } = mount(<MemoryRouter><WorklogGantt /></MemoryRouter>)
+    await waitFor(() => expect(container.querySelector('.wg-prog-num')?.textContent).toBe('80%'), { timeout: 8000 })
+    await user.click(container.querySelector<HTMLElement>('.wg-c--prog')!)
+    const popover = document.querySelector('.ant-popover:not(.ant-popover-hidden)') as HTMLElement
+    const handle = popover.querySelector<HTMLElement>('.ant-slider-handle')!
+    handle.focus()
+    ;(ledgerApi.updateTask as ReturnType<typeof vi.fn>).mockClear()
+    fireEvent.keyDown(handle, { code: 'ArrowRight', keyCode: 39, which: 39 })
+    fireEvent.keyUp(handle, { code: 'ArrowRight', keyCode: 39, which: 39 })
+    await waitFor(() => expect(ledgerApi.updateTask).toHaveBeenCalledTimes(1))
+    expect((ledgerApi.updateTask as ReturnType<typeof vi.fn>).mock.calls[0][1].progress).toBe(81)
   }, 30000)
 
   it('最新一笔就在当前查询周期时，往期快照卡不重复出现', async () => {

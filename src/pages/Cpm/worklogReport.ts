@@ -67,9 +67,17 @@ export interface WorkReport {
     backlog: number
     total: number
     inserted: number
+    /** 本期跟進工作項數（與 planType 正交）；旧后端缺省时前端本地派生 */
+    followUpCount?: number
+    followUpAvg?: number
+    blockedCount?: number
   }
   outputs: ReportRow[]
   insertedRows: ReportRow[]
+  /** 本期標記為跟進工作的行；服务端未回传时缺省 */
+  followUps?: ReportRow[]
+  /** 本期阻塞行（仍在正常聚合内，只作标记） */
+    blockedRows?: ReportRow[]
   risks: ReportRow[]
   notes: ReportRow[]
   plan: ReportRow[]
@@ -165,6 +173,11 @@ export function buildWorkReport(data: GanttData, start: Dayjs, end: Dayjs): Work
     const d = r.task.insertedAt ?? r.task.start
     return !!d && d >= s && d <= e
   })
+  // 跟進工作：独立维度，不按插入时点收窄（标记动作不等于排期时点），本期覆盖行里有标记即入选
+  const followUps = rows.filter(r => r.task.followUp)
+  const followUpCount = followUps.length
+  const followUpAvg = followUps.length ? Math.round(followUps.reduce((sum, r) => sum + r.pEnd, 0) / followUps.length) : 0
+  const blockedRows = rows.filter(r => r.task.blocked)
 
   const periodLen = end.diff(start, 'day') + 1
   /**
@@ -199,8 +212,8 @@ export function buildWorkReport(data: GanttData, start: Dayjs, end: Dayjs): Work
   }
 
   return {
-    start: s, end: e, rows, groups,
-    totals: { done, inProgress, avgStart, avgEnd, hours, overtimeHours, risks: risks.length, backlog: backlog.length, total: rows.length, inserted: insertedRows.length },
+    start: s, end: e, rows, groups, followUps, blockedRows,
+    totals: { done, inProgress, avgStart, avgEnd, hours, overtimeHours, risks: risks.length, backlog: backlog.length, total: rows.length, inserted: insertedRows.length, followUpCount, followUpAvg, blockedCount: blockedRows.length },
     outputs: rows.filter(r => r.doneAt).sort((a, b) => (a.doneAt! < b.doneAt! ? -1 : 1)),
     insertedRows, risks, notes, plan, daily, peak,
   }
@@ -221,6 +234,7 @@ export function autoOverview(r: WorkReport): string {
      夹在平均进度后面而不写出来，读的人只会以为本期真的有两个整天可用 */
   if (r.totals.overtimeHours > 0) parts.push(i18n.t('cpm.workReport.ov.overtime', { overtime: r.totals.overtimeHours, normal: r.totals.hours - r.totals.overtimeHours, defaultValue: '含加班 {{overtime}}h（正常 {{normal}}h）' }))
   if (r.totals.inserted > 0) parts.push(i18n.t('cpm.workReport.ov.inserted', { count: r.totals.inserted, defaultValue: '臨時插入 {{count}} 項' }))
+  if (r.totals.followUpCount) parts.push(i18n.t('cpm.workReport.ov.follow', { count: r.totals.followUpCount, avg: r.totals.followUpAvg ?? 0, defaultValue: '跟進 {{count}} 項（平均 {{avg}}%）' }))
   if (r.totals.risks > 0) parts.push(i18n.t('cpm.workReport.ov.risks', { count: r.totals.risks, defaultValue: '{{count}} 項逾期需關注' }))
   if (r.totals.backlog > 0) parts.push(i18n.t('cpm.workReport.ov.backlog', { count: r.totals.backlog, defaultValue: '{{count}} 項待排期' }))
   return `${parts.join(i18n.t('cpm.workReport.ov.sep', { defaultValue: '，' }))}。`
@@ -250,6 +264,8 @@ export function reportToMarkdown(r: WorkReport, periodLabel: string, summary?: s
     risks: r.totals.risks, backlog: r.totals.backlog, inserted: r.totals.inserted,
     defaultValue: '- 風險 {{risks}} 項・臨時插入 {{inserted}} 項・待排期 {{backlog}} 項',
   }), '')
+  // 跟进汇总单独成行：页面概览旗标与跟进小节说的同一句话，导出不能丢
+  if (r.totals.followUpCount) lines.push(i18n.t('cpm.workReport.md.followLine', { count: r.totals.followUpCount, avg: r.totals.followUpAvg ?? 0, defaultValue: '- 本期跟進 {{count}} 項 · 平均進度 {{avg}}%' }))
   lines.push(i18n.t('cpm.workReport.md.s2', { defaultValue: '## 二、本期內容' }), '')
   if (r.groups.length === 0) lines.push(i18n.t('cpm.workReport.md.noContent', { defaultValue: '- 本期無已排期的工作項任務' }))
   r.groups.forEach(g => {
@@ -263,8 +279,9 @@ export function reportToMarkdown(r: WorkReport, periodLabel: string, summary?: s
     g.rows.forEach(row => lines.push(i18n.t('cpm.workReport.md.contentRow', {
       task: row.task.title, from: row.pStart, to: row.pEnd, hours: row.hours,
       status: rowStatus(row, i18n.t), inserted: row.task.planType === 'inserted' ? i18n.t('cpm.workReport.md.insertedMark', { defaultValue: '［臨時插入］' }) : '',
+      follow: row.task.followUp ? i18n.t('cpm.workReport.md.followMark', { defaultValue: '［跟進］' }) : '',
       overtime: row.overtime > 0 ? i18n.t('cpm.workReport.md.overtimeMark', { overtime: row.overtime, defaultValue: '（含加班 {{overtime}}h）' }) : '',
-      defaultValue: '- {{task}}{{inserted}} — {{from}}% → {{to}}% · {{hours}}h{{overtime}} · {{status}}',
+      defaultValue: '- {{task}}{{inserted}}{{follow}} — {{from}}% → {{to}}% · {{hours}}h{{overtime}} · {{status}}',
     })))
     lines.push('')
   })

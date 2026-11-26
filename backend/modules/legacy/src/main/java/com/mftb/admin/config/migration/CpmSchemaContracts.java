@@ -32,6 +32,7 @@ public class CpmSchemaContracts implements SchemaContractProvider {
         list.add(pushRecordRevisionContract());
         list.add(worklogGroupContract());
         list.add(workCalendarContract());
+        list.add(worklogMarksContract());
         return list;
     }
 
@@ -167,7 +168,7 @@ public class CpmSchemaContracts implements SchemaContractProvider {
                 "biz_cpm_work_calendar",
                 "CREATE TABLE IF NOT EXISTS biz_cpm_work_calendar ( id BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键', "
                         + "user_id BIGINT NOT NULL DEFAULT 0 COMMENT '0=全局法定名单（節假日/補班）；其他=本人（調休/請假）。不用 NULL 是因为唯一键含 NULL 可并存多行', "
-                        + "work_date DATE NOT NULL COMMENT '被标记的日期（Asia/Shanghai 业务日）', "
+                        + "work_date DATE NOT NULL COMMENT '被标记的日期（Asia/Shanghai 业务日，与 item.work_date 可不同=补记历史）', "
                         + "day_type VARCHAR(16) NOT NULL COMMENT 'holiday=節假日 makeup=補班 comp_off=調休 leave=請假（只有補班计工时）', "
                         + "note VARCHAR(200) NULL COMMENT '备注（如「春节」「年假」），只作解释不参与计算', "
                         + "created_by VARCHAR(64) NOT NULL DEFAULT '' COMMENT '创建人', "
@@ -184,5 +185,30 @@ public class CpmSchemaContracts implements SchemaContractProvider {
                         new ContractSpec.ColumnSpec("user_id", null),
                         new ContractSpec.ColumnSpec("work_date", null),
                         new ContractSpec.ColumnSpec("day_type", null)));
+    }
+
+    /**
+     * biz_cpm_item 标记列（cpm:schema:v1.5）：跟进/阻塞/原因列。
+     * <p>DDL 必须与 346_cpm_worklog_marks.sql 一致；四列允许 SchemaContractValidator
+     * 在版本键已记但列被误删时自愈，避免下次查询 select * 才暴露 bad SQL grammar。
+     */
+    private ContractSpec worklogMarksContract() {
+        return new ContractSpec(
+                "cpm-worklog-marks-columns",
+                "biz_cpm_item",
+                null,
+                List.of(
+                        new ContractSpec.ColumnSpec("follow_up",
+                                "ALTER TABLE biz_cpm_item ADD COLUMN follow_up TINYINT NOT NULL DEFAULT 0"
+                                        + " COMMENT '1=跟进工作（与 planType 正交的独立维度）'"),
+                        new ContractSpec.ColumnSpec("blocked",
+                                "ALTER TABLE biz_cpm_item ADD COLUMN blocked TINYINT NOT NULL DEFAULT 0"
+                                        + " COMMENT '1=阻塞（只作标记，不冻结进度/备注/排期编辑）'"),
+                        new ContractSpec.ColumnSpec("blocked_reason",
+                                "ALTER TABLE biz_cpm_item ADD COLUMN blocked_reason VARCHAR(200) NULL"
+                                        + " COMMENT '阻塞原因（服务端必填校验，解除时清空）'"),
+                        new ContractSpec.ColumnSpec("cancel_reason",
+                                "ALTER TABLE biz_cpm_item ADD COLUMN cancel_reason VARCHAR(200) NULL"
+                                        + " COMMENT '人工取消原因（会议来源取消为空，由 source_type 区分）'")));
     }
 }

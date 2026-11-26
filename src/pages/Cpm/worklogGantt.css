@@ -255,12 +255,16 @@
 
 .wg-sheet {
   --wg-req: 148px;
-  --wg-task: 210px;
+  /* 任务子项加宽、耗时收窄：耗时只是数字（小时），104px 纯属浪费；
+     任务列多给 30px 后长标题折行更少、徽标行更不容易撑爆单元格 */
+  --wg-task: 240px;
   --wg-date: 116px;
-  --wg-hours: 104px;
+  --wg-hours: 88px;
   --wg-prog: 128px;
   --wg-status: 84px;
   --wg-note: 208px;
+  /* 操作列：标记类入口（跟進/臨時/阻塞/取消/刪除）常驻集中，不再藏在标题 hover 里 */
+  --wg-ops: 124px;
   --wg-row-h: 44px;
   --wg-add-h: 36px;
   --wg-head-h: 60px;
@@ -305,7 +309,9 @@
   position: sticky;
   left: 0;
   z-index: 30;
-  width: calc(var(--wg-req) + var(--wg-task) + var(--wg-date) * 2 + var(--wg-hours) + var(--wg-prog) + var(--wg-status) + var(--wg-note));
+  /* 宽度 = 全部列宽变量求和；新增列必须同步加进这个 calc，否则行内容宽于冻结左栏，
+     按钮会溢出盖到右侧甘特区（列表态 width:100% 不受影响，所以只有甘特态复现） */
+  width: calc(var(--wg-req) + var(--wg-task) + var(--wg-date) * 2 + var(--wg-hours) + var(--wg-prog) + var(--wg-status) + var(--wg-note) + var(--wg-ops));
   background: var(--surface-2);
   box-shadow: 2px 0 0 var(--border-1);
 }
@@ -912,8 +918,27 @@
 .wg-row:hover .wg-task__grip {
   opacity: 1;
 }
-.wg-task__title {
+/* 标题列容器：标题一行、徽标一行纵向堆叠，徽标不再和标题抢横向空间；
+   flex:1 只给列容器，给标题会把标题在列里竖向拉伸 */
+.wg-task__main {
   flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.wg-task__tags {
+  display: flex;
+  gap: 4px;
+  line-height: 16px;
+}
+/* 信号行：逾期/停滯独立子行，与标记行同款横排但语义分开（时间派生告警） */
+.wg-task__signals {
+  display: flex;
+  gap: 4px;
+  line-height: 16px;
+}
+.wg-task__title {
   min-width: 0;
   color: var(--text-1);
   /* 任务子项是重要信息：不截断不省略，整段换行全量展示；
@@ -1044,6 +1069,87 @@
   background: color-mix(in srgb, var(--purple) 12%, var(--surface-2));
 }
 
+/* ---- 行级虚拟化：分组容器保留完整高度，只挂载窗口行 ---- */
+
+.wg-rows--virtual,
+.wg-group-r--virtual {
+  position: relative;
+}
+.wg-rows--virtual .wg-row {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-top: 1px solid var(--border-2);
+}
+.wg-rows--virtual .wg-row--first {
+  border-top: none;
+}
+.wg-group-r--virtual .wg-rrow {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-top: 1px solid var(--border-2);
+}
+.wg-group-r--virtual .wg-rrow--first {
+  border-top: none;
+}
+.wg-addrow--virtual,
+.wg-addrow-r--virtual {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+}
+
+/* ---- 列表结束反馈 ---- */
+
+.wg-endcap {
+  position: sticky;
+  left: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 0 16px;
+  color: var(--text-3);
+  font-size: 12px;
+  opacity: 0.45;
+  transform: translateY(4px);
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+.wg-endcap.is-visible {
+  opacity: 1;
+  transform: none;
+}
+.wg-endcap__line {
+  width: 48px;
+  height: 1px;
+  background: var(--border-1);
+}
+.wg-tabbar__right {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.wg-list-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  color: var(--text-3);
+  background: var(--surface-3);
+  border: 1px solid var(--border-1);
+  transition: color 0.18s ease, background 0.18s ease, border-color 0.18s ease;
+}
+.wg-list-state.is-end {
+  color: var(--text-2);
+  background: color-mix(in srgb, var(--success) 8%, var(--surface-3));
+  border-color: color-mix(in srgb, var(--success) 22%, var(--border-2));
+}
+
 /* ---- 臨時插入標識 ---- */
 
 .wg-insert-tag {
@@ -1052,6 +1158,115 @@
   font-size: 10px;
   line-height: 16px;
   padding: 0 4px;
+}
+/* 跟進工作（与 planType 正交的独立标记）：gold 与「臨時」volcano 拉开色相，
+   两枚徽标可并排共存不互相遮挡 */
+.wg-follow-tag {
+  flex: none;
+  margin-inline-end: 0;
+  font-size: 10px;
+  line-height: 16px;
+  padding: 0 4px;
+}
+.wg-follow-on {
+  color: var(--warning);
+}
+/* 阻塞徽标：red 与状态列的逾期语义一致——都是「这件事卡住了」；
+   取消不另挂徽标：状态列已有「已取消」chip + 行置灰，再挂就是三处重复 */
+.wg-block-tag {
+  flex: none;
+  margin-inline-end: 0;
+  font-size: 10px;
+  line-height: 16px;
+  padding: 0 4px;
+}
+.wg-block-on {
+  color: var(--danger);
+}
+/* 跨週自动标签：cyan 冷色与人工标记（volcano/gold/red）拉开——它不是人打的标记，
+   是排期事实的自动提示 */
+.wg-crossweek-tag {
+  flex: none;
+  margin-inline-end: 0;
+  font-size: 10px;
+  line-height: 16px;
+  padding: 0 4px;
+}
+/* 逾期/停滯：状态列的时间派生补充标签，紧凑两字（天数在 tooltip），
+   与状态 chip 同列 flex-wrap，最多两行不撑高行 */
+.wg-overdue-tag,
+.wg-stalled-tag {
+  flex: none;
+  margin-inline-end: 0;
+  font-size: 10px;
+  line-height: 16px;
+  padding: 0 4px;
+}
+/* 与其余列同一模式：表头单元格靠 inline width，正文单元格必须在这里配等宽规则，
+   否则 .wg-c 的 flex:none 会把内容宽当成列宽，按钮直接撑出左栏压到甘特区 */
+.wg-c--ops {
+  width: var(--wg-ops);
+  justify-content: flex-start;
+  padding: 0 2px;
+  gap: 0;
+}
+/* 阻塞/取消原因面板：说明行 + 错误提示 */
+.wg-mark-hint {
+  margin: 0 0 8px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-2);
+}
+.wg-mark-error {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--danger);
+}
+/* 冻结态日期格降级为纯文本：不留「能点开但改不动」的假入口 */
+.wg-date-frozen {
+  font-size: 12px;
+  color: var(--text-3);
+}
+/* 汇报跟进小节：独立分组卡片，汇总行 + 每条进度，与 GroupBlock 同一层级视觉 */
+.rp-follow {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-2);
+  border-radius: 8px;
+  background: var(--surface-2);
+}
+.rp-follow__head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--warning-deep);
+}
+.rp-follow__head span {
+  font-size: 12px;
+  color: var(--text-2);
+}
+.rp-follow__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  font-size: 12px;
+}
+.rp-follow__title {
+  font-weight: 600;
+  color: var(--text-1);
+}
+.rp-follow__group {
+  flex: none;
+  color: var(--text-3);
+}
+.rp-follow__row .rp-cmp__pill {
+  flex: 1;
+}
+.rp-follow__num {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-2);
 }
 .wg-bar--inserted {
   border-style: dashed;
@@ -1491,12 +1706,14 @@
 .wg-sheet--collapsed .wg-h--prog,
 .wg-sheet--collapsed .wg-h--status,
 .wg-sheet--collapsed .wg-h--note,
+.wg-sheet--collapsed .wg-h--ops,
 .wg-sheet--collapsed .wg-c--start,
 .wg-sheet--collapsed .wg-c--end,
 .wg-sheet--collapsed .wg-c--hours,
 .wg-sheet--collapsed .wg-c--prog,
 .wg-sheet--collapsed .wg-c--status,
-.wg-sheet--collapsed .wg-c--note {
+.wg-sheet--collapsed .wg-c--note,
+.wg-sheet--collapsed .wg-c--ops {
   display: none;
 }
 

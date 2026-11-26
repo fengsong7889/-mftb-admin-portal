@@ -4520,6 +4520,21 @@
       "author": "Qoder",
       "ticket": "cpm-worklog-meeting-import",
       "comment": "meeting 与既有 meeting_action 刻意分成两个取值：行动项是「会上分给我的那件事」（带完成时限，单日），会议本体是「那段时间本身」（带预定起止，区间）。合成一个取值就会让 uk_cpm_item_source 把「导入这场会」与「导入会里某个行动项」判成同一件事，第二样永远导不进去；而两种日期语义挤进同一个 dueDate 字段后，界面无法解释导入后为什么多出两个日期。刻意不重跑 v1.2 的三条 CHECK：那两条已进账且本轮未改，重跑只会多两次 DROP/ADD 元数据锁，并把不相关的表一起拖进风险。取值真源仍是 CpmConstants.SOURCE_TYPES（校验与 DDL 同源）；后置校验实查 information_schema 的 CHECK_CLAUSE——约束存在但仍是旧五项时记成已迁移，比没记更危险。"
+    },
+    {
+      "versionKey": "cpm:schema:v1.5",
+      "module": "cpm",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "cpmSchemaMigrationInitializer",
+      "status": "ACTIVE",
+      "dependencies": [
+        "cpm:schema:v1.4"
+      ],
+      "intent": "biz_cpm_item 新增跟进/阻塞/原因四列；取消复用 status=cancelled，会议来源取消由 source_type 区分",
+      "author": "Qoder",
+      "ticket": "cpm-worklog-marks",
+      "comment": "follow_up/blocked 是与 planType 正交的独立布尔维度，不能塞进 plan_type 枚举；blocked 不能占用 status（statusOf 每次按进度重算会冲掉，且阻塞可与进行中并存）。blocked_reason/cancel_reason 服务端必填非空校验、200 字上限；取消复用既有 cancelled，不扩 CHECK。346 SQL 仅参考，幂等由 addColumnIfAbsent + 独立后置校验 + SchemaContract 自愈保证。"
     }
   ]
 }

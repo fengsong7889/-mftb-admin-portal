@@ -52,18 +52,24 @@ export function periodProgressOfTask(t: GanttTask): PeriodProgress {
   return { value: t.periodProgress ?? t.progress, kind: t.periodProgressKind ?? 'live' }
 }
 
-/** 標題可用文字寬度：--wg-task(210) 减手柄/操作图标/内边距后的保守值 */
-const TASK_TITLE_W = 130
+/** 標題可用文字寬度：--wg-task(240) 减内边距/手柄/三枚操作图标后的保守值——
+ * 宁可高估行数把行做高（多留白无害），也不能低估：行不够高时内容会顶到单元格上沿、
+ * 徽标行直接溢出边框压到相邻行（2026-11-26 生产截图实锤） */
+const TASK_TITLE_W = 110
 /** 標題单行高（12px 字号 × 1.5 行距向上取整） */
 const TASK_TITLE_LINE_H = 18
+/** 徽标行（臨時/跟進）自占一行的高度：16px 标签 + 行间距 */
+const TAG_LINE_H = 20
 /**
  * 標題换行后的行高：左侧 .wg-row 与右侧 .wg-rrow 必须用同一个数，
  * 否则甘特色条与左側行会逐行错位。按全角字符保守估算（半角只会算多不会算少），
  * 多出的留白无害，截断丢信息才是缺陷。
+ * <p>badgeRows = 标记行(0/1) + 信号行(0/1)：徽标拆成两个子行（人工/事实标记一行、
+ * 时间派生信号一行），每行≤4 枚不溢出；行高按子行数确定性累加，不靠宽度估算折行。
  */
-export function taskRowH(title: string): number {
+export function taskRowH(title: string, badgeRows = 0): number {
   const lines = Math.max(1, Math.ceil((title?.length ?? 0) * 12 / TASK_TITLE_W))
-  return Math.max(44, lines * TASK_TITLE_LINE_H + 10)
+  return Math.max(44, lines * TASK_TITLE_LINE_H + 10 + badgeRows * TAG_LINE_H)
 }
 
 export interface GanttTask {
@@ -87,6 +93,19 @@ export interface GanttTask {
   planType?: 'planned' | 'inserted'
   /** 標記為臨時插入的日期（YYYY-MM-DD）；原計劃為 null */
   insertedAt?: string | null
+  /**
+   * 跟進工作：與 planType 正交的獨立維度（可「臨時+跟進」並存），
+   * 標記需要持續後追的事項；缺省/undefined = 未標記。
+   */
+  followUp?: boolean
+  /**
+   * 阻塞：只作狀態標記，不凍結數據——阻塞期間進度/備註/排期照常可編輯；
+   * 原因必填，展示在標題區徽標的懸停提示裡。
+   */
+  blocked?: boolean
+  blockedReason?: string | null
+  /** 手工取消原因；會議來源取消無原因（系統對賬置位），與 cancelled 標記同進退 */
+  cancelReason?: string | null
   /**
    * 手工耗時覆蓋（小時）。缺省/ null 時耗時回落到「區間工作日 × 8h」的計算值；
    * 一旦用戶在耗時列改過就以它為準——計算值是預算口徑，人是唯一能說清實際投入的。
@@ -336,6 +355,49 @@ export function shiftDate(s: string | null, delta: number): string | null {
 /** 周一为一周起点 */
 export function mondayOf(d: Dayjs): Dayjs {
   return d.subtract((d.day() + 6) % 7, 'day')
+}
+
+/**
+ * 跨週判定：开始与结束不在同一个「周一起算」的週即跨週，自动展示不需人工标记。
+ * 未排期（缺任一日）不跨週；与台账週報/逐週进度同一周口径（mondayOf）。
+ * 跨月/跨年不另做标签：日期列已直接可见，且徽标行空间有限（見交付说明）。
+ */
+export function crossesWeek(start: string | null, end: string | null): boolean {
+  if (!start || !end) return false
+  const s = dayjs(start)
+  const e = dayjs(end)
+  if (!s.isValid() || !e.isValid()) return false
+  return mondayOf(s).format('YYYY-MM-DD') !== mondayOf(e).format('YYYY-MM-DD')
+}
+
+/** 停滯阈值：超过这么多天没推进度就算停滯（一处改全局生效） */
+export const STALL_DAYS = 7
+
+/**
+ * 逾期天数：结束日已过且未完成、未取消才算；与汇报风险节同一口径（today - end）。
+ * 返回 0 表示不逾期。台账状态列据此挂「逾期」标签——此前逾期只在汇报里可见。
+ */
+export function overdueDaysOf(t: GanttTask): number {
+  if (t.cancelled || !t.end || t.progress >= 100) return 0
+  const today = dayjs()
+  const end = dayjs(t.end)
+  if (!end.isValid() || !end.isBefore(today, 'day')) return 0
+  return today.diff(end, 'day')
+}
+
+/**
+ * 停滯天数：进行中（0<progress<100）且最近一笔进度流水早于阈值天数。
+ * 暴露「还没到 end 但已停摆」的被遗忘任务；未排期但有进度的行同样适用。
+ * 旧后端缺 latestProgressAt 时从已带回的流水兜底取最大日期。
+ */
+export function stalledDaysOf(t: GanttTask): number {
+  if (t.cancelled || t.progress <= 0 || t.progress >= 100) return 0
+  const last = t.latestProgressAt ?? (t.history ?? []).reduce<string | null>((m, h) => (m === null || h.at > m ? h.at : m), null)
+  if (!last) return 0
+  const at = dayjs(last)
+  if (!at.isValid()) return 0
+  const days = dayjs().diff(at, 'day')
+  return days >= STALL_DAYS ? days : 0
 }
 
 export interface DayCell {

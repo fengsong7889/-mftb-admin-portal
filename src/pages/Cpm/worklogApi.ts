@@ -38,6 +38,11 @@ interface TaskDTO {
   note?: string | null
   planType?: 'planned' | 'inserted'
   insertedAt?: string | null
+  /** 跟进/阻塞独立标记；旧后端缺省 false */
+  followUp?: boolean
+  blocked?: boolean
+  blockedReason?: string | null
+  cancelReason?: string | null
   hours: number
   /** 本期加班（服务端由合计减工作日 × 8h 派生）；旧后端未回传时按 0 读 */
   overtimeHours?: number
@@ -97,6 +102,10 @@ function toTask(t: TaskDTO): GanttTask {
     history: t.history?.map(h => ({ at: h.at, progress: h.progress })),
     planType: t.planType ?? 'planned',
     insertedAt: t.insertedAt ?? null,
+    followUp: t.followUp ?? false,
+    blocked: t.blocked ?? false,
+    blockedReason: t.blockedReason ?? null,
+    cancelReason: t.cancelReason ?? null,
     hoursOverride: t.hoursOverride ?? null,
     cancelled: t.cancelled ?? false,
     rdmSync: t.rdmSync ?? null,
@@ -149,6 +158,12 @@ export interface TaskForm {
   note?: string
   planType?: 'planned' | 'inserted'
   insertedAt?: string | null
+  /** 跟进/阻塞/取消标记；null=不改动，服务端重验原因与归属 */
+  followUp?: boolean
+  blocked?: boolean
+  blockedReason?: string | null
+  cancelled?: boolean
+  cancelReason?: string | null
   /**
    * 手工耗时覆盖（小时）。缺省/null = 不改动，沿用「工作日 × 8h」计算值；
    * 传 0 以上即表示用户手改过。服务端落 biz_cpm_item.work_hours（source=manual）。
@@ -201,6 +216,11 @@ export function restoreTask(id: number): Promise<void> {
   return request.post<unknown, void>(`/cpm/worklog/tasks/${id}/restore`)
 }
 
+/** 恢复取消态（与软删 restoreTask 分开）：清 cancelled/cancel_reason，status 按进度重算 */
+export function restoreTaskState(id: number): Promise<TaskDTO> {
+  return request.post<unknown, TaskDTO>(`/cpm/worklog/tasks/${id}/restore-state`)
+}
+
 /** 日历登记：type 传 null 表示恢复该天默认口径 */
 export function setCalendarDay(date: string, type: string | null, note?: string): Promise<void> {
   return request.put<unknown, void>('/cpm/worklog/calendar', { date, type, note })
@@ -220,8 +240,11 @@ export interface ReportRowDTO {
   groupTitle?: string | null
   start?: string | null
   end?: string | null
-  pStart: number
-  pEnd: number
+  /** Jackson 对 pStart/pEnd 的 JavaBean 命名会输出 pstart/pend；两种都兼容 */
+  pstart?: number
+  pend?: number
+  pStart?: number
+  pEnd?: number
   delta: number
   hours: number
   /** 本期加班（已含在 hours 里），服务端算 */
@@ -230,6 +253,10 @@ export interface ReportRowDTO {
   overdueDays: number
   planType: 'planned' | 'inserted'
   insertedAt?: string | null
+  followUp?: boolean
+  blocked?: boolean
+  blockedReason?: string | null
+  cancelReason?: string | null
   note?: string
   state: string
 }
@@ -253,6 +280,7 @@ export interface ReportDTO {
   end: string
   totals: {
     total: number; done: number; doing: number; pending: number; inserted: number
+    followUpCount?: number; followUpAvg?: number; blockedCount?: number
     backlog: number; risks: number; hours: number; overtimeHours?: number; avgProgress: number; avgStart: number; avgEnd: number
   }
   groups: ReportGroupDTO[]
@@ -260,6 +288,8 @@ export interface ReportDTO {
   notes: ReportRowDTO[]
   plan: ReportRowDTO[]
   insertedRows: ReportRowDTO[]
+  followUps?: ReportRowDTO[]
+  blockedRows?: ReportRowDTO[]
   daily: { key: string; hours: number; rest: boolean }[]
   peak?: { key: string; hours: number; rest: boolean } | null
 }
@@ -278,10 +308,12 @@ export function toWorkReport(dto: ReportDTO): WorkReportShape {
   const row = (r: ReportRowDTO): WorkReportShape['rows'][number] => ({
     task: {
       id: String(r.taskId), title: r.title, start: r.start ?? null, end: r.end ?? null,
-      progress: r.pEnd, note: r.note ?? '', planType: r.planType, insertedAt: r.insertedAt ?? null,
+      progress: r.pEnd ?? r.pend ?? 0, note: r.note ?? '', planType: r.planType, insertedAt: r.insertedAt ?? null,
+      followUp: r.followUp ?? false, blocked: r.blocked ?? false,
+      blockedReason: r.blockedReason ?? null, cancelReason: r.cancelReason ?? null,
     },
     group: { id: String(r.groupId ?? 0), title: r.groupTitle ?? '', hue: 0, tasks: [] },
-    pStart: r.pStart, pEnd: r.pEnd, delta: r.delta, hours: r.hours,
+    pStart: r.pStart ?? r.pstart ?? 0, pEnd: r.pEnd ?? r.pend ?? 0, delta: r.delta, hours: r.hours,
     overtime: r.overtimeHours ?? 0,
     doneAt: r.doneAt ?? null, overdueDays: r.overdueDays,
   })
@@ -298,9 +330,13 @@ export function toWorkReport(dto: ReportDTO): WorkReportShape {
       done: dto.totals.done, inProgress: dto.totals.doing, avgStart: dto.totals.avgStart, avgEnd: dto.totals.avgEnd,
       hours: dto.totals.hours, overtimeHours: dto.totals.overtimeHours ?? 0, risks: dto.totals.risks, backlog: dto.totals.backlog,
       total: dto.totals.total, inserted: dto.totals.inserted,
+      followUpCount: dto.totals.followUpCount ?? 0, followUpAvg: dto.totals.followUpAvg ?? 0,
+      blockedCount: dto.totals.blockedCount ?? 0,
     },
     outputs: [],
     insertedRows: dto.insertedRows.map(row),
+    followUps: (dto.followUps ?? dto.groups.flatMap(g => g.rows).filter(r => r.followUp)).map(row),
+    blockedRows: (dto.blockedRows ?? dto.groups.flatMap(g => g.rows).filter(r => r.blocked)).map(row),
     risks: dto.risks.map(row),
     notes: dto.notes.map(row),
     plan: dto.plan.map(row),

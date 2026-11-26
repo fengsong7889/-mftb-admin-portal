@@ -248,6 +248,12 @@ public class CpmWorklogService {
         validateRange(start, end);
         int progress = clampProgress(form.getProgress());
         String planType = planTypeOrThrow(form.getPlanType());
+        if (Boolean.TRUE.equals(form.getBlocked()) && !StringUtils.hasText(form.getBlockedReason())) {
+            throw new BusinessException("阻塞原因為必填");
+        }
+        if (Boolean.TRUE.equals(form.getCancelled()) && !StringUtils.hasText(form.getCancelReason())) {
+            throw new BusinessException("取消原因為必填");
+        }
 
         CpmItem item = new CpmItem();
         item.setUserId(current.getId());
@@ -264,6 +270,14 @@ public class CpmWorklogService {
         item.setPlanEnd(end);
         item.setPlanType(planType);
         item.setInsertedAt(insertedAtOf(planType, form.getInsertedAt(), currentPeriodAnchor()));
+        // 标记维度创建时也按表单落值（缺省关），不把 DTO 字段变成静默忽略的假契约
+        item.setFollowUp(Boolean.TRUE.equals(form.getFollowUp()) ? 1 : 0);
+        item.setBlocked(Boolean.TRUE.equals(form.getBlocked()) ? 1 : 0);
+        item.setBlockedReason(Boolean.TRUE.equals(form.getBlocked()) ? trim(form.getBlockedReason(), 200) : null);
+        item.setCancelReason(Boolean.TRUE.equals(form.getCancelled()) ? trim(form.getCancelReason(), 200) : null);
+        if (Boolean.TRUE.equals(form.getCancelled())) {
+            item.setStatus(CpmConstants.STATUS_CANCELLED);
+        }
         applyNote(item, form.getNote());
         applyHours(item, form.getHours(), false, current.getId());
         item.setVersion(0);
@@ -285,6 +299,17 @@ public class CpmWorklogService {
     public CpmWorklogDto.TaskVO updateTask(long id, CpmWorklogDto.TaskForm form) {
         SysUser current = guard.currentUser();
         CpmItem item = guard.requireOwnedItemForUpdate(id, current);
+        // 取消态是服务端安全边界：除 restore-state 专用接口外，标题/进度/排期/备注/标记一律拒写
+        if (CpmConstants.STATUS_CANCELLED.equals(item.getStatus())) {
+            throw new BusinessException("已取消任務不可編輯，請先恢復");
+        }
+        // 原因必填在前端只是 UX，服务端必须重验；上限 200 与 DTO/DDL 同源
+        if (Boolean.TRUE.equals(form.getBlocked()) && !StringUtils.hasText(form.getBlockedReason())) {
+            throw new BusinessException("阻塞原因為必填");
+        }
+        if (Boolean.TRUE.equals(form.getCancelled()) && !StringUtils.hasText(form.getCancelReason())) {
+            throw new BusinessException("取消原因為必填");
+        }
         LocalDate start = parseDate(form.getStart());
         LocalDate end = parseDate(form.getEnd());
         if (start == null) {
@@ -318,6 +343,23 @@ public class CpmWorklogService {
         if (affected == 0) {
             throw new BusinessException("記錄已被更新，請刷新後重試");
         }
+        // 标记列单独一条带版本 UPDATE：主字段先落定，再用 fresh.version，避免旧快照覆盖刚更新的状态
+        boolean marksChanged = form.getFollowUp() != null || form.getBlocked() != null || form.getCancelled() != null;
+        if (marksChanged) {
+            CpmItem fresh = itemMapper.selectAliveById(id);
+            int followUp = form.getFollowUp() == null ? one(fresh.getFollowUp()) : (form.getFollowUp() ? 1 : 0);
+            int blocked = form.getBlocked() == null ? one(fresh.getBlocked()) : (form.getBlocked() ? 1 : 0);
+            String blockedReason = form.getBlocked() == null ? fresh.getBlockedReason()
+                    : (form.getBlocked() ? trim(form.getBlockedReason(), 200) : null);
+            int cancelled = form.getCancelled() == null ? (CpmConstants.STATUS_CANCELLED.equals(fresh.getStatus()) ? 1 : 0)
+                    : (form.getCancelled() ? 1 : 0);
+            String cancelReason = form.getCancelled() == null ? fresh.getCancelReason()
+                    : (form.getCancelled() ? trim(form.getCancelReason(), 200) : null);
+            if (itemMapper.updateWorklogMarks(id, current.getId(), fresh.getVersion(), followUp, blocked,
+                    blockedReason, cancelled, cancelReason, current.getUsername()) == 0) {
+                throw new BusinessException("記錄已被更新，請刷新後重試");
+            }
+        }
         if (form.getProgress() != null && form.getProgress() != nullOrZero(item.getProgress())) {
             CpmItem fresh = itemMapper.selectAliveById(id);
             appendTrail(fresh, current);
@@ -342,6 +384,26 @@ public class CpmWorklogService {
         SysUser current = guard.currentUser();
         CpmItem item = guard.requireOwnedItem(id, current);
         itemMapper.softDeleteOwned(item.getId(), current.getId(), current.getName());
+    }
+
+    /**
+     * 恢复取消态（与软删 restoreTask 是两个语义）：只清 cancelled/cancel_reason，
+     * 保留跟进/阻塞等其它标记，status 按当前 progress 重算；带归属与乐观锁。
+     */
+    @Transactional
+    public CpmWorklogDto.TaskVO restoreState(long id) {
+        SysUser current = guard.currentUser();
+        CpmItem item = guard.requireOwnedItemForUpdate(id, current);
+        if (!CpmConstants.STATUS_CANCELLED.equals(item.getStatus())) {
+            throw new BusinessException("該任務不是取消狀態");
+        }
+        if (itemMapper.updateWorklogMarks(id, current.getId(), item.getVersion(), one(item.getFollowUp()),
+                one(item.getBlocked()), item.getBlockedReason(), 0, null, current.getUsername()) == 0) {
+            throw new BusinessException("記錄已被更新，請刷新後重試");
+        }
+        CpmItem fresh = itemMapper.selectAliveById(id);
+        return taskVO(fresh, workdays.load(current.getId(), itemPeriodFrom(fresh),
+                currentPeriodAnchor().plusYears(1)), null, null, Map.of());
     }
 
     @Transactional
@@ -651,6 +713,10 @@ public class CpmWorklogService {
         vo.setOvertimeHours(CpmWorkdays.overtimeHoursOf(vo.getHours(), vo.getWorkdays()));
         // 来源已取消优先于进度：一场被取消的会不该因为进度停在 60% 就被念成「还在进行中」
         vo.setCancelled(CpmConstants.STATUS_CANCELLED.equals(item.getStatus()));
+        vo.setFollowUp(one(item.getFollowUp()) == 1);
+        vo.setBlocked(one(item.getBlocked()) == 1);
+        vo.setBlockedReason(item.getBlockedReason());
+        vo.setCancelReason(item.getCancelReason());
         vo.setState(stateOf(item.getStatus(), item.getProgress(), item.getPlanStart()));
         vo.setSourceType(item.getSourceType());
         vo.setSourceRef(item.getSourceRef());
@@ -667,6 +733,8 @@ public class CpmWorklogService {
         CpmWorklogDto.TotalsVO t = new CpmWorklogDto.TotalsVO();
         int total = 0;
         int sumProgress = 0;
+        int followUpCount = 0;
+        int followUpProgress = 0;
         for (CpmWorklogDto.GroupVO group : vo.getGroups()) {
             for (CpmWorklogDto.TaskVO task : group.getTasks()) {
                 boolean inRange = from == null || (task.getStart() != null && task.getEnd() != null
@@ -697,11 +765,20 @@ public class CpmWorklogService {
                 if (CpmConstants.PLAN_TYPE_INSERTED.equals(task.getPlanType())) {
                     t.setInserted(t.getInserted() + 1);
                 }
+                if (task.isFollowUp()) {
+                    followUpCount++;
+                    followUpProgress += progress;
+                }
+                if (task.isBlocked()) {
+                    t.setBlockedCount(t.getBlockedCount() + 1);
+                }
                 t.setHours(t.getHours() + task.getPeriodHours());
             }
         }
         t.setTotal(total);
         t.setAvgProgress(total == 0 ? 0 : Math.round((float) sumProgress / total));
+        t.setFollowUpCount(followUpCount);
+        t.setFollowUpAvg(followUpCount == 0 ? 0 : Math.round((float) followUpProgress / followUpCount));
         return t;
     }
 
@@ -937,6 +1014,11 @@ public class CpmWorklogService {
 
     private static int nullOrZero(Integer value) {
         return value == null ? 0 : value;
+    }
+
+    /** 数据库布尔列归一：NULL/非 1 一律视作未标记 */
+    private static int one(Integer value) {
+        return value != null && value == 1 ? 1 : 0;
     }
 
     private static int clampProgress(Integer progress) {

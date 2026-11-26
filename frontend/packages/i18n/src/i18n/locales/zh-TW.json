@@ -18306,7 +18306,8 @@
         "start": "開始日期",
         "task": "任務子項",
         "progressEnd": "進度（{{name}}期末）",
-        "progressEndTip": "顯示該查詢周期期末的落定值；期內無更新沿用期前最後一筆，從未更新為 0%。點擊行內進度可更新最新值。"
+        "progressEndTip": "顯示該查詢周期期末的落定值；期內無更新沿用期前最後一筆，從未更新為 0%。點擊行內進度可更新最新值。",
+        "ops": "操作"
       },
       "confirm": {
         "deleteItemTitle": "確定刪除整個工作項？",
@@ -18396,7 +18397,14 @@
         "planRestored": "已恢復為原計劃",
         "sheetNotReady": "台账尚未載入",
         "taskDeleted": "已刪除子任務。",
-        "syncFailed": "保存失敗，請重試"
+        "syncFailed": "保存失敗，請重試",
+        "followMarked": "已標記為跟進工作",
+        "followCleared": "已取消跟進標記",
+        "blockCleared": "已解除阻塞，任務狀態按進度恢復",
+        "restored": "已恢復，任務可正常編輯",
+        "reasonRequired": "原因為必填，請填寫後再確認",
+        "blocked": "已標記阻塞，進度與備註仍可正常編輯",
+        "cancelled": "已取消該任務，編輯已凍結；僅可刪除或恢復"
       },
       "newItemTitle": "新工作項",
       "note": {
@@ -18437,8 +18445,11 @@
         "prev": "上一期"
       },
       "plan": {
-        "inserted": "臨時插入",
-        "planned": "原計劃"
+        "inserted": "臨時任務",
+        "planned": "計劃任務",
+        "caliberTitle": "計劃屬性過濾口徑",
+        "caliber": "「計劃任務」與「臨時任務」互斥，每條任務只屬其一；「跟進任務」是獨立維度——一條任務可以既是臨時任務又被標記跟進，切到這兩檔都會看到它。各檔按當前所選精確過濾，命中即顯示。",
+        "follow": "跟進任務"
       },
       "pop": {
         "editNote": "編輯備註",
@@ -18490,7 +18501,7 @@
         "doneTip": "完成時點落在查詢區間（與匯報同口徑）",
         "hours": "總耗時（工作日口徑）",
         "hoursTip": "區間交集工作日 × 8h",
-        "insertedAllTip": "全部標記為臨時插入的工作項",
+        "insertedAllTip": "全部標記為臨時任務的工作項",
         "insertedTip": "插入時點落在查詢區間",
         "pendingNow": "待完成",
         "pendingNowTip": "當前狀態為待處理/待排期",
@@ -18503,12 +18514,19 @@
         "deriveTip": "由進度自動判定：100% 已完成；1–99% 進行中；0% 待處理；未排期為待排期",
         "plan": "待排期",
         "todo": "待處理",
-        "cancelledTip": "來源會議已取消：安排保留作為事實，但不再計入待完成與工時"
+        "cancelledTip": "來源會議已取消：安排保留作為事實，但不再計入待完成與工時",
+        "manualCancelledTip": "已取消・{{reason}}：編輯已凍結，可刪除或恢復",
+        "blockedTip": "阻塞中・{{reason}}：狀態標記不凍結編輯，解除後按進度恢復"
       },
       "subtaskN": "子任務 {{count}}",
       "suffix": {
         "item": " 項",
         "percent": "%"
+      },
+      "list": {
+        "end": "已顯示全部 {{count}} 個子任務",
+        "atEnd": "已到底 · 共 {{count}} 項",
+        "more": "向下滾動查看更多"
       },
       "tabbar": {
         "summary": "{{tasks}} 個子任務 · {{workdays}} 個工作日",
@@ -18565,6 +18583,49 @@
         "desc": "新任務還沒有排期，當前週期篩選不到它；切到「全部」就能改名與排期。",
         "ok": "切換到「全部」查看",
         "withSubtask": "{{title}}（含子任務 1）"
+      },
+      "block": {
+        "unmarkTitle": "確定解除阻塞？",
+        "reasonLabel": "阻塞原因：",
+        "unmarkOk": "解除阻塞",
+        "hint": "阻塞只作狀態標記：任務仍可正常編輯進度、備註與排期；原因會顯示在阻塞徽標的懸停提示裡。",
+        "placeholder": "請填寫阻塞原因（必填）",
+        "tag": "阻塞",
+        "unmarkTip": "解除阻塞",
+        "markTip": "標記阻塞（需填原因）",
+        "tagTip": "阻塞中・{{reason}}",
+        "modalTitle": "標記阻塞・{{title}}"
+      },
+      "cancel": {
+        "restoreTitle": "恢復為可編輯狀態？",
+        "reasonLabel": "取消原因：",
+        "meetingSource": "來源會議已取消",
+        "restoreOk": "恢復",
+        "hint": "取消後該任務的編輯全部凍結（標題/進度/排期/備註/標記），僅保留「刪除」與「恢復」兩個入口。",
+        "placeholder": "請填寫取消原因（必填）",
+        "restoreTip": "恢復為可編輯狀態",
+        "markTip": "取消任務（需填原因）",
+        "modalTitle": "取消任務・{{title}}"
+      },
+      "follow": {
+        "tagTip": "跟進工作・需要持續後追的事項",
+        "tag": "跟進",
+        "unmarkTip": "取消跟進標記",
+        "markTip": "標記為跟進工作",
+        "label": "跟進",
+        "none": "一般"
+      },
+      "crossweek": {
+        "tag": "跨週",
+        "tagTip": "跨週任務・{{start}} ~ {{end}} 不在同一週（週一起算），會出現在多期週報"
+      },
+      "overdue": {
+        "tag": "逾期",
+        "tagTip": "逾期 {{days}} 天・結束 {{end}} 已過仍未完成"
+      },
+      "stalled": {
+        "tag": "停滯",
+        "tagTip": "已 {{days}} 天沒有進度更新（閾值 {{threshold}} 天）"
       }
     },
     "holiday": {
@@ -18693,7 +18754,9 @@
         "backlogItem": "- [待排期] {{count}} 項未排期任務不計工時",
         "groupTitleOt": "### {{title}}（{{count}} 項 · {{hours}}h，含加班 {{overtime}}h）",
         "overtime": "- 其中加班 {{overtime}}h（正常 {{normal}}h）",
-        "overtimeMark": "（含加班 {{overtime}}h）"
+        "overtimeMark": "（含加班 {{overtime}}h）",
+        "followMark": "［跟進］",
+        "followLine": "- 本期跟進 {{count}} 項 · 平均進度 {{avg}}%"
       },
       "outputs": {
         "none": "本期無完成事項——進行中的推進見下節。"
@@ -18706,7 +18769,8 @@
         "progress": "平均進度 {{from}}% → {{to}}%（{{delta}}%）",
         "risks": "{{count}} 項逾期需關注",
         "sep": "，",
-        "overtime": "含加班 {{overtime}}h（正常 {{normal}}h）"
+        "overtime": "含加班 {{overtime}}h（正常 {{normal}}h）",
+        "follow": "跟進 {{count}} 項（平均 {{avg}}%）"
       },
       "overdueDays": "逾期 {{days}} 天",
       "overdueShort": "逾期 {{days}}d",
@@ -18737,7 +18801,8 @@
         "hours": "投入工時",
         "risks": "風險事項",
         "overtime": "含加班 {{overtime}}h",
-        "overtimeTip": "正常 {{normal}}h ＋ 加班 {{overtime}}h；加班由服務端按交集工作日派生，不另存字段"
+        "overtimeTip": "正常 {{normal}}h ＋ 加班 {{overtime}}h；加班由服務端按交集工作日派生，不另存字段",
+        "follow": "跟進工作"
       },
       "summaryPlaceholder": "寫一句本期總結（留空則用自動概述，導出同文）",
       "tab": {
@@ -18751,7 +18816,11 @@
       "covered": "本期覆蓋",
       "loadFailed": "匯報載入失敗",
       "loading": "匯報聚合中…",
-      "groupOvertime": "含加班 {{overtime}}h"
+      "groupOvertime": "含加班 {{overtime}}h",
+      "follow": {
+        "title": "跟進工作",
+        "summary": "本期跟進 {{count}} 項 · 平均進度 {{avg}}%"
+      }
     },
     "meetingImport": {
       "button": "導入會議",

@@ -176,6 +176,23 @@ public interface CpmItemMapper extends BaseMapper<CpmItem> {
                            @Param("noteHtml") String noteHtml, @Param("noteText") String noteText,
                            @Param("operator") String operator);
 
+    /**
+     * 台账标记更新：跟进/阻塞/取消原因 + status 重算，带归属与乐观锁。
+     * <p>blocked 不占 status（进度每次更新都会重算 status）；取消复用 cancelled，
+     * 恢复时按当前 progress 回到 done/doing/todo。SQL 用当前 progress 列，避免服务层
+     * 旧快照把刚更新的进度状态覆盖回旧值。
+     */
+    @Update("<script>UPDATE biz_cpm_item SET"
+            + " follow_up = #{followUp}, blocked = #{blocked}, blocked_reason = #{blockedReason}, cancel_reason = #{cancelReason},"
+            + " status = CASE WHEN #{cancelled} = 1 THEN 'cancelled' WHEN progress >= 100 THEN 'done'"
+            + " WHEN progress &gt; 0 THEN 'doing' ELSE 'todo' END,"
+            + " version = version + 1, updated_by = #{operator}, updated_at = NOW()"
+            + " WHERE id = #{id} AND user_id = #{userId} AND deleted = 0 AND version = #{version}</script>")
+    int updateWorklogMarks(@Param("id") long id, @Param("userId") long userId, @Param("version") int version,
+                           @Param("followUp") int followUp, @Param("blocked") int blocked,
+                           @Param("blockedReason") String blockedReason, @Param("cancelled") int cancelled,
+                           @Param("cancelReason") String cancelReason, @Param("operator") String operator);
+
     /** 恢复一条被误删的条目（台账删除供的「撒销」走这里，不新建重复事实）。 */
     @Update("UPDATE biz_cpm_item SET deleted = 0, updated_by = #{operator}, updated_at = NOW() "
             + "WHERE id = #{id} AND user_id = #{userId} AND deleted = 1")
