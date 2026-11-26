@@ -18571,6 +18571,13 @@
         "tipNotStarted": "The period had not started (0%) · click to update the current value",
         "tipPeriod": "{{label}} end-of-period snapshot · click to update the current progress",
         "tipStale": "No update in this period; the last earlier value is kept · click to update the current value"
+      },
+      "locate": {
+        "title": "Added, but not visible in the current period",
+        "label": "New record: ",
+        "desc": "This task has no schedule yet, so the current-period filter does not show it. Switch to \"All\" to rename and schedule it.",
+        "ok": "Switch to \"All\"",
+        "withSubtask": "{{title}} (with subtask 1)"
       }
     },
     "holiday": {

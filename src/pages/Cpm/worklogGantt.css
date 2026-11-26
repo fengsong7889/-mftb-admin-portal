@@ -625,6 +625,18 @@
   margin-top: 3px;
   color: var(--info);
 }
+
+/* 新增定位确认弹窗的说明段：confirm-info-row 是 flex 行且首列 flex-shrink:0，
+   长句塞进去不折行会横向溢出弹窗；说明不是「标签+短值」，改走独立段落自然折行 */
+.custom-confirm-modal .wg-locate-desc {
+  margin: 0;
+  padding-top: 6px;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--text-2);
+  white-space: normal;
+  word-break: break-word;
+}
 /* 「往期快照」只读历史上下文：冷色（info→purple）与「目前最新」的品牌橙拉开时态层级；
    左轨 + tinted 图标 + 迷你进度条让它一眼是「归档卡片」而不是可操作区。
    不带任何可提交控件，写明提交只会记录到今天。 */

@@ -332,13 +332,41 @@ export default function WorklogGantt() {
       void apiUpdateGroup(Number(gid), { title: patch.title, hue: origin.hue }).catch(syncError)
     }
   }
+  /**
+   * 未排期的行在週期檔永遠不可見：時間篩選只作用於已排期任務，未排期在「全部」檔可見。
+   * <p>在週期檔下新增子任務/工作項，新行必然未排期，點下去就是「沒反應」——
+   * 用戶以為失敗會連續再點，造出一串「子任務」。成功必須給反饋，並把定位去處擺成一個選擇：
+   * 確認彈窗二選一——取消（留在當前週期視圖）或切到「全部」，切換後 freshId 隨即進入改名態，
+   * 用戶可以直接操作這條新任務。不改週期觀察口徑：期檔混入不屬於該期的行，
+   * 會讓列表與統計卡數字打架，也等於替用戶編造排期。
+   */
+  const offerLocateHidden = (label: string) => {
+    if (!timeRange) return
+    Modal.confirm({
+      title: t('cpm.gantt.locate.title', { defaultValue: '新增成功，當前週期不顯示' }),
+      width: 520,
+      className: 'custom-confirm-modal',
+      icon: <span className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></span>,
+      content: (
+        <div className="confirm-info-card">
+          <div className="confirm-info-row"><span>{t('cpm.gantt.locate.label', { defaultValue: '新增記錄：' })}</span><b>{label}</b></div>
+          <p className="wg-locate-desc">{t('cpm.gantt.locate.desc', { defaultValue: '新任務還沒有排期，當前週期篩選不到它；切到「全部」就能改名與排期。' })}</p>
+        </div>
+      ),
+      okText: t('cpm.gantt.locate.ok', { defaultValue: '切換到「全部」查看' }),
+      cancelText: t('common.cancel', { defaultValue: '取消' }),
+      onOk: () => { setTimePreset('all'); setPeriodOffset(0) },
+    })
+  }
   const addGroup = () => {
     void (async () => {
       try {
-        const created = await apiCreateGroup({ title: t('cpm.gantt.newItemTitle', { defaultValue: '新工作項' }), hue: data.groups.length % GROUP_COLORS.length })
+        const groupTitle = t('cpm.gantt.newItemTitle', { defaultValue: '新工作項' })
+        const created = await apiCreateGroup({ title: groupTitle, hue: data.groups.length % GROUP_COLORS.length })
         await apiCreateTask({ groupId: created.id, title: t('cpm.gantt.subtaskN', { count: 1, defaultValue: '子任務 {{count}}' }), progress: 0 })
         await reload()
         setFreshId(String(created.id))
+        offerLocateHidden(t('cpm.gantt.locate.withSubtask', { title: groupTitle, defaultValue: '{{title}}（含子任務 1）' }))
       } catch (e) { syncError(e) }
     })()
   }
@@ -346,13 +374,15 @@ export default function WorklogGantt() {
     void (async () => {
       try {
         const count = (data.groups.find(g => g.id === gid)?.tasks.length ?? 0) + 1
+        const title = t('cpm.gantt.subtaskN', { count, defaultValue: '子任務 {{count}}' })
         const created = await apiCreateTask({
           groupId: Number(gid),
-          title: t('cpm.gantt.subtaskN', { count, defaultValue: '子任務 {{count}}' }),
+          title,
           progress: 0, planType: 'planned', insertedAt: null,
         })
         await reload()
         setFreshId(String(created.id))
+        offerLocateHidden(title)
       } catch (e) { syncError(e) }
     })()
   }
