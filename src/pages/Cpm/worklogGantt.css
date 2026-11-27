@@ -885,6 +885,30 @@
   line-height: 1.5;
   color: var(--warning-deep);
 }
+.wg-prog-history--loading,
+.wg-prog-history__truncated {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-3);
+}
+
+/* ---- 更早归档抽屉 ---- */
+
+.wg-archive-summary {
+  margin: 0 0 12px;
+  font-size: 12px;
+  color: var(--text-2);
+}
+.wg-archive-footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  margin-top: 12px;
+  font-size: 12px;
+  color: var(--text-3);
+}
 
 /* ---- 已取消：色条降为描边，不删行也不参与进度色阶 ---- */
 
@@ -1735,6 +1759,29 @@
 }
 .wg-capture-host .wg-sheet {
   box-shadow: none;
+}
+
+/* 導出快照的標題欄：快照脫離頁面後得自解釋「哪個週期的工作內容」 */
+.wg-capture-host .wg-capture-title {
+  padding: 20px 16px 12px;
+  text-align: center;
+  color: var(--text-1);
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.wg-capture-host .wg-capture-subtitle {
+  margin-top: 4px;
+  color: var(--text-3);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+/* 導出快照的統計帶：寬度由 JS 按表體實測寬算好後置中，
+   這裡只給留白與和表體的間隔；卡片樣式沿用 .wg-stats，不在這裡複述第二遍 */
+.wg-capture-host .wg-stats--capture {
+  margin: 0 auto 16px;
+  padding: 16px 16px 0;
 }
 
 /* ---- 底部 sheet 標籤欄 ---- */

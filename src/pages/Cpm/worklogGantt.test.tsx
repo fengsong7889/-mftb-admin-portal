@@ -35,6 +35,11 @@ vi.mock('./worklogApi', async (importOriginal) => {
   return {
     ...actual,
     fetchLedger: vi.fn(async () => ledger()),
+    fetchTaskHistory: vi.fn(async () => ({ history: [], truncated: false })),
+    fetchLedgerArchive: vi.fn(async () => ({
+      groups: [], loadedTaskCount: 0, matchingTaskCount: 0, truncated: false,
+      hasEarlierArchive: false, earlierArchiveCount: 0, nextCursorDate: null, nextCursorId: null,
+    })),
     createGroup: vi.fn(async () => ({})),
     updateGroup: vi.fn(async () => ({})),
     deleteGroup: vi.fn(async () => undefined),
@@ -239,5 +244,44 @@ describe('统一工作记录视图', () => {
     } finally {
       if (original) fetchMock.mockImplementation(original)
     }
+  })
+
+  it('达到容量上限时如实提示已载入范围，并开放更早归档入口', async () => {
+    const ledgerApi = await import('./worklogApi')
+    const fetchMock = ledgerApi.fetchLedger as ReturnType<typeof vi.fn>
+    const original = fetchMock.getMockImplementation()
+    fetchMock.mockResolvedValue({
+      data: FIXTURE, rangeStart: null, rangeEnd: null, hasUngrouped: true,
+      loadedTaskCount: 6, matchingTaskCount: 2500, truncated: true,
+      hasEarlierArchive: true, earlierArchiveCount: 500,
+    })
+    try {
+      mount()
+      await screen.findByText('銷售定價-門店')
+      expect(screen.getByText(/目前載入 6 條，當前查詢共 2500 條/)).toBeTruthy()
+      expect(screen.getByText('另有 500 筆更早歸檔')).toBeTruthy()
+      // 截斷橫幅與底部結束帶各有一個歸檔入口：同名按鈕有兩個是刻意設計，不能用 getByRole 單命中
+      expect(screen.getAllByRole('button', { name: /查看更早歸檔/ })).toHaveLength(2)
+    } finally {
+      if (original) fetchMock.mockImplementation(original)
+    }
+  })
+
+  it('进度历史只在首次打开弹层时懒加载一次', async () => {
+    const user = userEvent.setup()
+    const ledgerApi = await import('./worklogApi')
+    const historyMock = ledgerApi.fetchTaskHistory as ReturnType<typeof vi.fn>
+    historyMock.mockClear()
+    historyMock.mockResolvedValue({ history: [{ at: d(0), progress: 35 }], truncated: false })
+    const { container } = mount()
+    await screen.findByText('銷售定價-門店')
+    const row = screen.getByText('相似引擎對賬').closest('.wg-row')!
+    await user.click(row.querySelector('.wg-c--prog')!)
+    await waitFor(() => expect(historyMock).toHaveBeenCalledWith('t9'))
+    await waitFor(() => expect(document.querySelectorAll('.wg-prog-history__row').length).toBeGreaterThan(0))
+    await user.click(row.querySelector('.wg-c--prog')!)
+    await user.click(row.querySelector('.wg-c--prog')!)
+    expect(historyMock).toHaveBeenCalledTimes(1)
+    expect(container).toBeTruthy()
   })
 })

@@ -4535,6 +4535,21 @@
       "author": "Qoder",
       "ticket": "cpm-worklog-marks",
       "comment": "follow_up/blocked 是与 planType 正交的独立布尔维度，不能塞进 plan_type 枚举；blocked 不能占用 status（statusOf 每次按进度重算会冲掉，且阻塞可与进行中并存）。blocked_reason/cancel_reason 服务端必填非空校验、200 字上限；取消复用既有 cancelled，不扩 CHECK。346 SQL 仅参考，幂等由 addColumnIfAbsent + 独立后置校验 + SchemaContract 自愈保证。"
+    },
+    {
+      "versionKey": "cpm:schema:v1.6",
+      "module": "cpm",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "cpmSchemaMigrationInitializer",
+      "status": "ACTIVE",
+      "dependencies": [
+        "cpm:schema:v1.5"
+      ],
+      "intent": "biz_cpm_item 增加台账容量窗口与更早归档游标所需复合索引",
+      "author": "Qoder",
+      "ticket": "cpm-worklog-capacity",
+      "comment": "默认全部档改为活动任务 + 最近 12 个月关闭任务，显式时间档按区间过滤；两条索引分别覆盖状态/更新时间窗口与日期游标排序。347 SQL 仅参考，幂等由 addIndexIfAbsent + 后置校验保证。索引为附加对象，回滚只回代码不删除结构。"
     }
   ]
 }

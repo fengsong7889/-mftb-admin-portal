@@ -78,6 +78,18 @@ interface LedgerDTO {
   makeups: string[]
   compOffs: string[]
   leaves: string[]
+  loadedTaskCount?: number
+  matchingTaskCount?: number
+  truncated?: boolean
+  hasEarlierArchive?: boolean
+  earlierArchiveCount?: number
+  nextCursorDate?: string | null
+  nextCursorId?: number | null
+}
+
+interface HistoryPageDTO {
+  history?: HistoryDTO[]
+  truncated?: boolean
 }
 
 export const UNGROUPED_ID = 0
@@ -107,6 +119,8 @@ function toTask(t: TaskDTO): GanttTask {
     blockedReason: t.blockedReason ?? null,
     cancelReason: t.cancelReason ?? null,
     hoursOverride: t.hoursOverride ?? null,
+    hours: t.hours,
+    workdays: t.workdays,
     cancelled: t.cancelled ?? false,
     rdmSync: t.rdmSync ?? null,
   }
@@ -121,7 +135,24 @@ function toGroup(g: GroupDTO): GanttGroup {
   }
 }
 
-export interface LedgerResult {
+export interface LedgerQuery {
+  start?: string | null
+  end?: string | null
+  keyword?: string | null
+  status?: string | null
+  planType?: string | null
+  groupId?: string | null
+}
+
+export interface LedgerCapacityMeta {
+  loadedTaskCount: number
+  matchingTaskCount: number
+  truncated: boolean
+  hasEarlierArchive: boolean
+  earlierArchiveCount: number
+}
+
+export interface LedgerResult extends LedgerCapacityMeta {
   data: GanttData
   /** 服务端算好的区间工时/统计所需天数，界面不再自己数工作日 */
   rangeStart: string | null
@@ -130,22 +161,62 @@ export interface LedgerResult {
   hasUngrouped: boolean
 }
 
-export async function fetchLedger(start?: string, end?: string): Promise<LedgerResult> {
-  const dto = await request.get<unknown, LedgerDTO>('/cpm/worklog/ledger', { params: { start, end } })
-  const groups = (dto.groups ?? []).map(g => ({ ...toGroup(g), virtual: isVirtualGroup(g.id) }))
+export interface ArchiveResult extends LedgerCapacityMeta {
+  groups: GanttGroup[]
+  nextCursorDate: string | null
+  nextCursorId: number | null
+}
+
+function ledgerCapacity(dto: LedgerDTO, groups: GanttGroup[]): LedgerCapacityMeta {
+  const loaded = dto.loadedTaskCount ?? groups.reduce((sum, g) => sum + g.tasks.length, 0)
   return {
-    data: {
-      // 虚拟分组的标题留空，由界面按当前语言渲染「未分組記錄」，避免服务端回传中文；
-      // virtual 标记必须透传到台账模型，否则界面会把只读容器当普通工作項给改名/删除入口
-      groups: groups.map(g => ({ id: g.id, title: g.title, hue: g.hue, tasks: g.tasks, virtual: g.virtual })),
-      holidays: dto.holidays ?? [],
-      makeup: dto.makeups ?? [],
-      compOff: dto.compOffs ?? [],
-      leave: dto.leaves ?? [],
-    },
+    loadedTaskCount: loaded,
+    matchingTaskCount: dto.matchingTaskCount ?? loaded,
+    truncated: dto.truncated ?? false,
+    hasEarlierArchive: dto.hasEarlierArchive ?? false,
+    earlierArchiveCount: dto.earlierArchiveCount ?? 0,
+  }
+}
+
+export async function fetchLedger(query: LedgerQuery = {}): Promise<LedgerResult> {
+  const params = Object.fromEntries(Object.entries(query).filter(([, v]) => v != null && v !== ''))
+  const dto = await request.get<unknown, LedgerDTO>('/cpm/worklog/ledger', { params })
+  const groups = (dto.groups ?? []).map(g => ({ ...toGroup(g), virtual: isVirtualGroup(g.id) }))
+  const data: GanttData = {
+    // 虚拟分组的标题留空，由界面按当前语言渲染「未分組記錄」，避免服务端回传中文；
+    // virtual 标记必须透传到台账模型，否则界面会把只读容器当普通工作項给改名/删除入口
+    groups: groups.map(g => ({ id: g.id, title: g.title, hue: g.hue, tasks: g.tasks, virtual: g.virtual })),
+    holidays: dto.holidays ?? [],
+    makeup: dto.makeups ?? [],
+    compOff: dto.compOffs ?? [],
+    leave: dto.leaves ?? [],
+  }
+  return {
+    data,
+    ...ledgerCapacity(dto, groups),
     rangeStart: dto.rangeStart ?? null,
     rangeEnd: dto.rangeEnd ?? null,
     hasUngrouped: groups.some(g => g.virtual),
+  }
+}
+
+export async function fetchLedgerArchive(query: LedgerQuery, cursorDate?: string, cursorId?: number): Promise<ArchiveResult> {
+  const params = Object.fromEntries(Object.entries({ ...query, cursorDate, cursorId, limit: 100 }).filter(([, v]) => v != null && v !== ''))
+  const dto = await request.get<unknown, LedgerDTO>('/cpm/worklog/ledger/archive', { params })
+  const groups = (dto.groups ?? []).map(g => ({ ...toGroup(g), virtual: isVirtualGroup(g.id) }))
+  return {
+    groups,
+    ...ledgerCapacity(dto, groups),
+    nextCursorDate: dto.nextCursorDate ?? null,
+    nextCursorId: dto.nextCursorId ?? null,
+  }
+}
+
+export async function fetchTaskHistory(id: string): Promise<{ history: { at: string; progress: number }[]; truncated: boolean }> {
+  const dto = await request.get<unknown, HistoryPageDTO>(`/cpm/worklog/tasks/${id}/history`)
+  return {
+    history: (dto.history ?? []).map(h => ({ at: h.at, progress: h.progress })),
+    truncated: dto.truncated ?? false,
   }
 }
 

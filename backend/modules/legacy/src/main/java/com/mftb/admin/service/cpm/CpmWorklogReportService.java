@@ -79,7 +79,7 @@ public class CpmWorklogReportService {
         for (CpmItemUpdate row : updateMapper.listByUserAndRange(userId, from.minusDays(TRAIL_BACK_DAYS), to)) {
             trails.computeIfAbsent(row.getItemId(), k -> new ArrayList<>()).add(row);
         }
-        List<CpmItem> all = itemMapper.listLedger(userId);
+        List<CpmItem> all = itemMapper.listAllForUser(userId);
         Map<Long, CpmWorklogGroup> groups = new LinkedHashMap<>();
         for (CpmWorklogGroup group : groupMapper.listMine(userId)) {
             groups.put(group.getId(), group);

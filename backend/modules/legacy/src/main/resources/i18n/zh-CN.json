@@ -18353,11 +18353,14 @@
         "title": "没有符合条件的记录"
       },
       "export": {
+        "at": "导出时间 {{time}}",
+        "content": "工作内容",
         "csv": "Excel 表格（CSV）",
         "failed": "导出失败，请重试",
         "fileBase": "我的工作记录_{{date}}",
         "imageDone": "已下载当前台账的长图快照",
-        "pdfDone": "已下载当前台账的 A4 分页 PDF"
+        "pdfDone": "已下载当前台账的 A4 分页 PDF",
+        "titleAll": "全部（{{start}} ~ {{end}}）"
       },
       "hours": {
         "tip": "{{days}} 个工作日 × {{hours}}h = {{hours}}h（周末/节假日不计）· 点击可手工填写",
@@ -18404,7 +18407,8 @@
         "restored": "已恢复，任务可正常编辑",
         "reasonRequired": "原因为必填，请填写后再确认",
         "blocked": "已标记阻塞，进度与备注仍可正常编辑",
-        "cancelled": "已取消该任务，编辑已冻结；仅可删除或恢复"
+        "cancelled": "已取消该任务，编辑已冻结；仅可删除或恢复",
+        "historyFailed": "进度历史载入失败"
       },
       "newItemTitle": "新工作项",
       "note": {
@@ -18523,10 +18527,25 @@
         "item": " 项",
         "percent": "%"
       },
+      "capacity": {
+        "truncated": "目前载入 {{loaded}} 条，当前查询共 {{matching}} 条",
+        "truncatedDesc": "为保持页面流畅，单次只载入最近记录。请缩小时间范围，或查看更早归档。",
+        "openArchive": "查看更早归档"
+      },
       "list": {
         "end": "已显示全部 {{count}} 个子任务",
         "atEnd": "已到底 · 共 {{count}} 项",
-        "more": "向下滚动查看更多"
+        "more": "向下滚动查看更多",
+        "recentEnd": "近期记录已载入 {{loaded}} 条 · 另有 {{earlier}} 笔更早归档",
+        "openArchive": "查看更早归档",
+        "hasArchive": "另有 {{count}} 笔更早归档"
+      },
+      "archive": {
+        "title": "更早归档记录",
+        "loadFailed": "更早归档载入失败",
+        "summary": "已载入 {{loaded}} 条 · 更早归档共 {{matching}} 条",
+        "loadMore": "载入更多更早记录",
+        "end": "更早归档已全部载入（{{count}} 条）"
       },
       "tabbar": {
         "summary": "{{tasks}} 个子任务 · {{workdays}} 个工作日",
@@ -18561,6 +18580,8 @@
       "progress": {
         "historyDelta": "较上期 {{value}}%",
         "historyNow": "当前已改至 {{value}}%，尚未保存为新一期记录",
+        "historyLoading": "进度历史加载中…",
+        "historyTruncated": "仅显示最近 400 天进度流水",
         "historyTitle": "逐周进度",
         "historyViewTip": "历史周期仅展示当时快照，进度条不随调整变化；最新进度已保存，切到「全部」或含今天的周期即可查看。",
         "noHistory": "尚无进度更新记录",

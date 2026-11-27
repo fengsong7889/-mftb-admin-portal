@@ -111,6 +111,10 @@ export interface GanttTask {
    * 一旦用戶在耗時列改過就以它為準——計算值是預算口徑，人是唯一能說清實際投入的。
    */
   hoursOverride?: number | null
+  /** 服务端算出的整段工时；旧后端缺省时由适配层回退工作日口径 */
+  hours?: number
+  /** 服务端算出的排期工作日数；归档抽屉只读展示，不重算 */
+  workdays?: number
   /** 來源系統類型（meeting/rdm_task/…）；手工錄入為 null */
   sourceType?: string | null
   /** 來源對象 ID（與 sourceType 成對，重复导入由服务端唯一键裁决） */

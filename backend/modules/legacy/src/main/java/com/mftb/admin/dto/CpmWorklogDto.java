@@ -125,7 +125,7 @@ public final class CpmWorklogDto {
         private List<TaskVO> tasks = new ArrayList<>();
     }
 
-    /** 一次台账读取：分组 + 任务 + 区间生效的日历 + 服务端算好的统计 */
+    /** 一次台账读取：分组 + 任务 + 区间生效的日历 + 服务端算好的统计 + 容量元数据。 */
     @Data
     public static class LedgerVO {
         private String rangeStart;
@@ -136,6 +136,25 @@ public final class CpmWorklogDto {
         private List<String> compOffs = new ArrayList<>();
         private List<String> leaves = new ArrayList<>();
         private TotalsVO totals = new TotalsVO();
+        /** 本次真正返回的子任务数（与 totals 同一已加载口径）。 */
+        private int loadedTaskCount;
+        /** 当前窗口/筛选口径下的总数，不是数据库全量。 */
+        private int matchingTaskCount;
+        /** 当前口径超过单次上限；界面必须如实提示，不能让用户把局部当全部。 */
+        private boolean truncated;
+        /** 默认全部档是否存在更早归档。 */
+        private boolean hasEarlierArchive;
+        private int earlierArchiveCount;
+        /** 归档游标页的下一页起点；普通台账读取为空。 */
+        private String nextCursorDate;
+        private Long nextCursorId;
+    }
+
+    /** 单条任务进度历史：打开弹层时才读取，列表不再批量携带全部流水。 */
+    @Data
+    public static class HistoryPageVO {
+        private List<HistoryVO> history = new ArrayList<>();
+        private boolean truncated;
     }
 
     @Data

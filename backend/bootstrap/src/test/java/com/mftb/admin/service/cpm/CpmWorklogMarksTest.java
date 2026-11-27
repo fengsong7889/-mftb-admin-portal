@@ -161,7 +161,7 @@ class CpmWorklogMarksTest {
         cancelled.setStatus(CpmConstants.STATUS_CANCELLED);
         CpmItem cancelledFuture = item(4L, "取消的下期项", 0, MON.plusDays(7), MON.plusDays(8));
         cancelledFuture.setStatus(CpmConstants.STATUS_CANCELLED);
-        when(itemMapper.listLedger(7L)).thenReturn(List.of(follow, normal, cancelled, cancelledFuture));
+        when(itemMapper.listAllForUser(7L)).thenReturn(List.of(follow, normal, cancelled, cancelledFuture));
         when(groupMapper.listMine(7L)).thenReturn(List.<CpmWorklogGroup>of());
 
         CpmWorklogReportService service = new CpmWorklogReportService(itemMapper, updateMapper, groupMapper, workdays, periods, guard);

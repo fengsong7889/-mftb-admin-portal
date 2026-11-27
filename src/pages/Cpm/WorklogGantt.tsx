@@ -29,10 +29,12 @@ import {
 // 不加别名会让本地函数把导入顶掉，编译期就报参数不匹配
 import {
   createGroup as apiCreateGroup, createTask as apiCreateTask, deleteGroup as apiDeleteGroup,
-  deleteTask as apiDeleteTask, fetchLedger, importLocalLedger, isVirtualGroup, reorderGroups as apiReorderGroups,
+  deleteTask as apiDeleteTask, fetchLedger, fetchTaskHistory, importLocalLedger, isVirtualGroup,
+  reorderGroups as apiReorderGroups,
   restoreGroup as apiRestoreGroup, restoreTask as apiRestoreTask, restoreTaskState as apiRestoreState, toImportPayload,
-  updateGroup as apiUpdateGroup, updateTask as apiUpdateTask,
+  updateGroup as apiUpdateGroup, updateTask as apiUpdateTask, type LedgerCapacityMeta,
 } from './worklogApi'
+import WorklogArchiveDrawer from './WorklogArchiveDrawer'
 import { doneAtOf } from './worklogReport'
 import { noteToDisplayHtml, noteToText, sanitizeNoteHtml } from './noteRich'
 // 日视图并入后的三项能力：它们都打在 biz_cpm_item 同一张表上，不是另一套数据
@@ -108,6 +110,8 @@ const VIRTUAL_ROW_THRESHOLD = 60
 const VIRTUAL_OVERSCAN_PX = 180
 const ADD_ROW_H = 36
 const END_CAP_H = 48
+/** 导出快照里统计带的最大宽度：再宽就是六块空板，卡片字号并不随带宽放大 */
+const STATS_CAPTURE_MAX_W = 1400
 
 export default function WorklogGantt() {
   const { t } = useTranslation()
@@ -156,9 +160,17 @@ export default function WorklogGantt() {
    * 用户会因此不去检查自己那一侧的开关。
    */
   const [syncGateOpen, setSyncGateOpen] = useState(true)
+  const [capacity, setCapacity] = useState<LedgerCapacityMeta>({
+    loadedTaskCount: 0, matchingTaskCount: 0, truncated: false, hasEarlierArchive: false, earlierArchiveCount: 0,
+  })
+  const [archiveOpen, setArchiveOpen] = useState(false)
+  const [historyCache, setHistoryCache] = useState<Record<string, { history: { at: string; progress: number }[]; truncated: boolean }>>({})
+  const [historyLoading, setHistoryLoading] = useState<Record<string, boolean>>({})
+  const historyCacheRef = useRef<Record<string, { history: { at: string; progress: number }[]; truncated: boolean }>>({})
   const undoRef = useRef<(() => void) | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const sheetRef = useRef<HTMLDivElement>(null)
+  const statsRef = useRef<HTMLDivElement>(null)
 
   /* ---------- 時間維度查詢：六檔 + 周期翻頁偏移，實時聯動列表與統計 ---------- */
   const timeRange = useMemo(() => {
@@ -292,12 +304,27 @@ export default function WorklogGantt() {
   }, [filteredGroups, data, rangeStartStr, rangeEndStr])
   const filterKey = `${keyword}|${statusFilter}|${planFilter}|${groupFilter}|${timePreset}|${rangeStartStr}|${rangeEndStr}`
   const totalTaskCount = useMemo(() => filteredGroups.reduce((sum, g) => sum + g.tasks.length, 0), [filteredGroups])
+  const ledgerQuery = useMemo(() => ({
+    start: rangeStartStr ?? undefined,
+    end: rangeEndStr ?? undefined,
+    keyword: keyword.trim() || undefined,
+    status: statusFilter === 'all' ? undefined : statusFilter,
+    planType: planFilter === 'all' ? undefined : planFilter,
+    groupId: groupFilter === 'all' ? undefined : groupFilter,
+  }), [rangeStartStr, rangeEndStr, keyword, statusFilter, planFilter, groupFilter])
 
   /* ---------- 读取：服务端台账是唯一真源 ---------- */
   const reload = useCallback(async () => {
     try {
-      const res = await fetchLedger(rangeStartStr ?? undefined, rangeEndStr ?? undefined)
+      const res = await fetchLedger(ledgerQuery)
       setData(res.data)
+      setCapacity({
+        loadedTaskCount: res.loadedTaskCount,
+        matchingTaskCount: res.matchingTaskCount,
+        truncated: res.truncated,
+        hasEarlierArchive: res.hasEarlierArchive,
+        earlierArchiveCount: res.earlierArchiveCount,
+      })
       setLoadError(null)
       if (res.data.groups.length === 0) {
         // 迁移向导：只在服务端为空且浏览器还存着旧台账时探一次，不弹窗不阻断
@@ -314,7 +341,7 @@ export default function WorklogGantt() {
     } finally {
       setLoading(false)
     }
-  }, [rangeStartStr, rangeEndStr, t])
+  }, [ledgerQuery, t])
 
   useEffect(() => { void reload() }, [reload])
 
@@ -727,6 +754,19 @@ export default function WorklogGantt() {
     patchTask(gid, tid, { start: key, end: key })
   }, [patchTask])
   const reloadLedger = useCallback(async () => { await reloadRef.current() }, [])
+  const loadTaskHistory = useCallback(async (tid: string) => {
+    if (historyCacheRef.current[tid] || historyLoading[tid]) return
+    setHistoryLoading(current => ({ ...current, [tid]: true }))
+    try {
+      const result = await fetchTaskHistory(tid)
+      historyCacheRef.current = { ...historyCacheRef.current, [tid]: result }
+      setHistoryCache(historyCacheRef.current)
+    } catch (e) {
+      message.error(e instanceof Error ? e.message : t('cpm.gantt.msg.historyFailed', { defaultValue: '進度歷史載入失敗' }))
+    } finally {
+      setHistoryLoading(current => ({ ...current, [tid]: false }))
+    }
+  }, [historyLoading, t])
   const scrollToToday = (smooth = true) => {
     const idx = visibleDays.findIndex(d => d.today)
     const el = scrollRef.current
@@ -786,6 +826,31 @@ export default function WorklogGantt() {
   }, [measurePane, loading, data.groups.length, filteredGroups.length, totalTaskCount])
 
   /* ---------- 导出：长图 PNG / A4 PDF / CSV ---------- */
+  /** 全部档没有查询区间，但服务端也只回空区间；导出快照里的“全部”得拿实际取到的数据跨度来说话 */
+  const loadedSpan = useMemo(() => {
+    const dates: string[] = []
+    filteredGroups.forEach(g => g.tasks.forEach(t => {
+      if (t.start) dates.push(t.start)
+      if (t.end) dates.push(t.end)
+    }))
+    if (!dates.length) return null
+    dates.sort()
+    return { start: dates[0], end: dates[dates.length - 1] }
+  }, [filteredGroups])
+
+  /** 导出标题：周期口径 + 「工作內容」。周期文案复用 rangeLabel，不另建一套取数口径 */
+  const exportTitle = useMemo(() => {
+    const period = timeRange
+      ? rangeLabel
+      : t('cpm.gantt.export.titleAll', {
+          start: loadedSpan?.start ?? '-', end: loadedSpan?.end ?? '-',
+          defaultValue: '全部（{{start}} ~ {{end}}）',
+        })
+    // 中英排版差异：以全角字/括号结尾不补空格（「…月工作內容」），以数字或半角括号结尾时必须补（「…2026 Work Content」）
+    const sep = /[\u3400-\u9fff\uf900-\ufaff\uff00-\uffef]$/.test(period) ? '' : ' '
+    return `${period}${sep}${t('cpm.gantt.export.content', { defaultValue: '工作內容' })}`
+  }, [timeRange, rangeLabel, loadedSpan, t])
+
   const runExport = async (kind: DocumentExportKind | 'csv') => {
     if (kind === 'csv') {
       exportCsv(filteredGroups, data)
@@ -805,12 +870,44 @@ export default function WorklogGantt() {
       // 离屏克隆展开滚动区：截整张台账（全部周列 + 全部行），不动真实 DOM
       const host = document.createElement('div')
       host.className = 'wg-capture-host'
+      const wrap = document.createElement('div')
+      wrap.className = 'wg-capture'
       const clone = src.cloneNode(true) as HTMLElement
-      host.appendChild(clone)
+      /* 標題欄：快照脫離頁面後必須自解釋「這是哪個週期的台賬」，否則只剩一堆行列 */
+      const title = document.createElement('div')
+      title.className = 'wg-capture-title'
+      const titleMain = document.createElement('div')
+      titleMain.textContent = exportTitle
+      const titleSub = document.createElement('div')
+      titleSub.className = 'wg-capture-subtitle'
+      titleSub.textContent = t('cpm.gantt.export.at', { time: dayjs().format('YYYY-MM-DD HH:mm'), defaultValue: '導出時間 {{time}}' })
+      title.append(titleMain, titleSub)
+      wrap.appendChild(title)
+      /* 統計卡片一併入鏡：導出的該是「帶匯總的台賬快照」。只截表體時，
+         拿到文件的人分不清「本期完成 8 項」指的是哪個口徑，卡片本身也無法轉成文字。 */
+      const statsClone = statsRef.current?.cloneNode(true) as HTMLElement | undefined
+      if (statsClone) {
+        statsClone.classList.add('wg-stats--capture')
+        // 計數動畫 1200ms 從 0 起跳，改完篩選立刻導出會截到半程數字；
+        // 快照一律按 data-* 裡的終值覆寫，不留動畫中間態
+        statsClone.querySelectorAll<HTMLElement>('.wg-stat__num').forEach(el => {
+          const { statValue, statSuffix } = el.dataset
+          if (statValue !== undefined) el.textContent = `${statValue}${statSuffix ?? ''}`
+        })
+        wrap.appendChild(statsClone)
+      }
+      wrap.appendChild(clone)
+      host.appendChild(wrap)
       document.body.appendChild(host)
+      if (statsClone) {
+        // 帶寬取「表體實測寬」與上限的較小值：全部檔表體能拉到幾千像素寬，
+        // 卡片跟著 1fr 撐開會變成空板；窄表體時又不能讓快照右側留白條
+        const sheetW = clone.getBoundingClientRect().width
+        statsClone.style.width = `${Math.max(320, Math.min(sheetW, STATS_CAPTURE_MAX_W))}px`
+      }
       try {
         const fileBase = t('cpm.gantt.export.fileBase', { date: fmt(dayjs()), defaultValue: '我的工作記錄_{{date}}' })
-        await exportDocument(clone, kind, fileBase, { alias: 'cpm-worklog-gantt', fallbackName: 'worklog' })
+        await exportDocument(wrap, kind, fileBase, { alias: 'cpm-worklog-gantt', fallbackName: 'worklog' })
         message.success(kind === 'image'
           ? t('cpm.gantt.export.imageDone', { defaultValue: '已下載當前台账的長圖快照' })
           : t('cpm.gantt.export.pdfDone', { defaultValue: '已下載當前台账的 A4 分頁 PDF' }))
@@ -824,11 +921,22 @@ export default function WorklogGantt() {
       setExportBusy(null)
     }
   }
-  const exportItems: MenuProps['items'] = [
+  /* 截斷時導出只覆蓋已載入窗口：選單頂部用分組標題把範圍說清楚，
+     否則拿到文件的人會把「最近 2000 條」誤讀成全量（二期才接服務端全量導出） */
+  const exportScopeNote = capacity.truncated
+    ? t('cpm.gantt.capacity.truncated', {
+        loaded: capacity.loadedTaskCount, matching: capacity.matchingTaskCount,
+        defaultValue: '目前載入 {{loaded}} 條，當前查詢共 {{matching}} 條',
+      })
+    : null
+  const exportEntries: MenuProps['items'] = [
     { key: 'image', icon: <FileImageOutlined />, label: t('cpm.export.image', { defaultValue: '長圖圖片（PNG）' }) },
     { key: 'pdf', icon: <FilePdfOutlined />, label: t('cpm.export.pdf', { defaultValue: 'PDF 文件（A4 分頁）' }) },
     { key: 'csv', icon: <FileExcelOutlined />, label: t('cpm.gantt.export.csv', { defaultValue: 'Excel 表格（CSV）' }) },
   ]
+  const exportItems: MenuProps['items'] = exportScopeNote
+    ? [{ type: 'group', label: exportScopeNote, children: exportEntries }]
+    : exportEntries
 
   const applySearch = () => setKeyword(keywordDraft)
   const resetSearch = () => { setKeywordDraft(''); setKeyword(''); setStatusFilter('all'); setPlanFilter('all'); setGroupFilter('all') }
@@ -930,6 +1038,17 @@ export default function WorklogGantt() {
           message={t('cpm.gantt.loadFailed', { defaultValue: '台账載入失敗' })} description={loadError}
           action={<Button size="small" onClick={() => void reload()}>{t('cpm.sourceImport.retry', { defaultValue: '重試' })}</Button>} />
       )}
+      {capacity.truncated && (
+        <Alert type="info" showIcon style={{ marginBottom: 14 }}
+          message={t('cpm.gantt.capacity.truncated', {
+            loaded: capacity.loadedTaskCount, matching: capacity.matchingTaskCount,
+            defaultValue: '目前載入 {{loaded}} 條，當前查詢共 {{matching}} 條',
+          })}
+          description={t('cpm.gantt.capacity.truncatedDesc', { defaultValue: '為保持页面流畅，单次只载入最近记录。请缩小时间范围，或查看更早归档。' })}
+          action={capacity.hasEarlierArchive ? (
+            <Button size="small" onClick={() => setArchiveOpen(true)}>{t('cpm.gantt.capacity.openArchive', { defaultValue: '查看更早归档' })}</Button>
+          ) : undefined} />
+      )}
       {/* 搜索區：單排彈性布局，自定義區間出現時把查詢/重置往後擠 */}
       <div className="search-section wg-search">
         <Form layout="inline" onFinish={applySearch}>
@@ -1020,11 +1139,14 @@ export default function WorklogGantt() {
       </div>
 
       {/* 統計卡片：§B.7 三段式動效卡，搜索區下方，key 觸發計數動畫 */}
-      <div className="wg-stats" key={filterKey}>
+      <div className="wg-stats" key={filterKey} ref={statsRef}>
         {statCards.map(c => (
           <div key={c.label} className="wg-stat" style={{ '--stat-color': c.color, '--stat-bg': c.bg } as CSSProperties}>
             <div className="wg-stat__icon">{c.icon}</div>
-            <div className="wg-stat__num"><AnimatedNumber value={c.value} suffix={c.suffix} /></div>
+            {/* data-* 存的是未走動畫的終值，供導出快照覆寫（見 runExport 註解） */}
+            <div className="wg-stat__num" data-stat-value={c.value.toLocaleString()} data-stat-suffix={c.suffix}>
+              <AnimatedNumber value={c.value} suffix={c.suffix} />
+            </div>
             <div className="wg-stat__label" title={c.title}>{c.label}</div>
           </div>
         ))}
@@ -1217,6 +1339,10 @@ export default function WorklogGantt() {
                               onRestore={restoreCancelled}
                               syncGateOpen={syncGateOpen}
                               onReload={reloadLedger}
+                              history={historyCache[meta.task.id]?.history ?? meta.task.history}
+                              historyLoading={!!historyLoading[meta.task.id]}
+                              historyTruncated={!!historyCache[meta.task.id]?.truncated}
+                              onLoadHistory={loadTaskHistory}
                               viewEnd={viewEndStr}
                               viewLabel={rangeLabel}
                             />
@@ -1284,6 +1410,10 @@ export default function WorklogGantt() {
                             onEditNote={openNote}
                             onToggleInserted={toggleInserted}
                             onToggleFollowUp={toggleFollowUp}
+                            history={historyCache[meta.task.id]?.history ?? meta.task.history}
+                            historyLoading={!!historyLoading[meta.task.id]}
+                            historyTruncated={!!historyCache[meta.task.id]?.truncated}
+                            onLoadHistory={loadTaskHistory}
                             viewEnd={viewEndStr}
                             viewLabel={rangeLabel}
                           />
@@ -1297,7 +1427,19 @@ export default function WorklogGantt() {
             </div>
             <div className={`wg-endcap${atBottom ? ' is-visible' : ''}`} style={{ height: END_CAP_H }}>
               <span className="wg-endcap__line" />
-              <span>{t('cpm.gantt.list.end', { count: totalTaskCount, defaultValue: '已顯示全部 {{count}} 個子任務' })}</span>
+              {capacity.hasEarlierArchive ? (
+                <>
+                  <span>{t('cpm.gantt.list.recentEnd', {
+                    loaded: totalTaskCount, earlier: capacity.earlierArchiveCount,
+                    defaultValue: '近期記錄已載入 {{loaded}} 條 · 另有 {{earlier}} 筆更早歸檔',
+                  })}</span>
+                  <Button size="small" type="link" onClick={() => setArchiveOpen(true)}>
+                    {t('cpm.gantt.list.openArchive', { defaultValue: '查看更早歸檔' })}
+                  </Button>
+                </>
+              ) : (
+                <span>{t('cpm.gantt.list.end', { count: totalTaskCount, defaultValue: '已顯示全部 {{count}} 個子任務' })}</span>
+              )}
               <span className="wg-endcap__line" />
             </div>
           </div>
@@ -1336,11 +1478,13 @@ export default function WorklogGantt() {
                   count: stats.cancelled, defaultValue: ' · {{count}} 項已取消（不計工時）',
                 })}
               </span>
-              <span className={`wg-list-state${atBottom ? ' is-end' : ''}`}>
-                {atBottom ? <CheckCircleOutlined /> : <CaretDownOutlined />}
-                {atBottom
-                  ? t('cpm.gantt.list.atEnd', { count: totalTaskCount, defaultValue: '已到底 · 共 {{count}} 項' })
-                  : t('cpm.gantt.list.more', { defaultValue: '向下滾動查看更多' })}
+              <span className={`wg-list-state${atBottom && !capacity.hasEarlierArchive ? ' is-end' : ''}`}>
+                {atBottom && !capacity.hasEarlierArchive ? <CheckCircleOutlined /> : <CaretDownOutlined />}
+                {capacity.hasEarlierArchive
+                  ? t('cpm.gantt.list.hasArchive', { count: capacity.earlierArchiveCount, defaultValue: '另有 {{count}} 筆更早歸檔' })
+                  : atBottom
+                    ? t('cpm.gantt.list.atEnd', { count: totalTaskCount, defaultValue: '已到底 · 共 {{count}} 項' })
+                    : t('cpm.gantt.list.more', { defaultValue: '向下滾動查看更多' })}
               </span>
             </span>
           </div>
@@ -1403,6 +1547,11 @@ export default function WorklogGantt() {
         onImported={() => void reload()}
         /** 会议本体必须走台账写入而不是条目侧 createCpmItem：它带的是区间，不是单日 */
         onImportMeeting={importMeeting}
+      />
+      <WorklogArchiveDrawer
+        open={archiveOpen}
+        query={ledgerQuery}
+        onClose={() => setArchiveOpen(false)}
       />
     </div>
   )
@@ -1478,12 +1627,16 @@ interface LeftRowProps {
   syncGateOpen: boolean
   /** 徽标开关/重新对齐后重拉台账：回写结果只在服务端，本地拼不出真实状态 */
   onReload: () => Promise<void>
+  history?: { at: string; progress: number }[]
+  historyLoading: boolean
+  historyTruncated: boolean
+  onLoadHistory: (id: string) => void
   /** 查询周期联动：期末快照值由服务端回传，viewEnd/viewLabel 只用于回顾卡与轨迹高亮 */
   viewEnd: string | null
   viewLabel: string
 }
 
-const LeftRow = memo(function LeftRow({ group, meta, hover, top, firstRow, virtualized, onHover, fresh, dropTarget, onDropTarget, onReorder, onPatchTask, onPreviewTask, onStartTask, onEndTask, onDeleteTask, onEditNote, onToggleInserted, onToggleFollowUp, onToggleBlock, onToggleCancel, onRestore, syncGateOpen, onReload, viewEnd, viewLabel }: LeftRowProps) {
+const LeftRow = memo(function LeftRow({ group, meta, hover, top, firstRow, virtualized, onHover, fresh, dropTarget, onDropTarget, onReorder, onPatchTask, onPreviewTask, onStartTask, onEndTask, onDeleteTask, onEditNote, onToggleInserted, onToggleFollowUp, onToggleBlock, onToggleCancel, onRestore, syncGateOpen, onReload, history, historyLoading, historyTruncated, onLoadHistory, viewEnd, viewLabel }: LeftRowProps) {
   const { t } = useTranslation()
   const task = meta.task
   const status = taskStatus(task)
@@ -1500,6 +1653,7 @@ const LeftRow = memo(function LeftRow({ group, meta, hover, top, firstRow, virtu
    * 下一次定位很容易命中点不动的旧弹层。与「更新進度」弹层同一做法。
    */
   const [hoursOpen, setHoursOpen] = useState(false)
+  const [progressOpen, setProgressOpen] = useState(false)
   const patch = useCallback((p: Partial<GanttTask>) => onPatchTask(group.id, task.id, p), [group.id, onPatchTask, task.id])
   const preview = useCallback((p: Partial<GanttTask>) => onPreviewTask(group.id, task.id, p), [group.id, onPreviewTask, task.id])
   const handleStart = useCallback((v: string | null) => onStartTask(group.id, task, v), [group.id, onStartTask, task])
@@ -1635,8 +1789,14 @@ const LeftRow = memo(function LeftRow({ group, meta, hover, top, firstRow, virtu
       <Popover
         trigger={frozen ? [] : 'click'}
         placement="bottom"
+        open={progressOpen}
+        onOpenChange={open => {
+          setProgressOpen(open)
+          if (open && !history?.length) void onLoadHistory(task.id)
+        }}
         content={(
-          <ProgressEditor task={task} view={meta.view} viewLabel={viewLabel} viewEnd={viewEnd} onPatch={patch} onPreview={preview} />
+          <ProgressEditor task={task} view={meta.view} viewLabel={viewLabel} viewEnd={viewEnd} onPatch={patch} onPreview={preview}
+            history={history} historyLoading={historyLoading} historyTruncated={historyTruncated} />
         )}
       >
         <Tooltip title={viewTip(meta.view, viewLabel, t)}>
@@ -1864,7 +2024,7 @@ function viewTip(view: PeriodProgress, viewLabel: string, t: (k: string, o?: Rec
  * 而视图里的进度条是历史落定快照、不会随之变化——不说这句，用户会把「保存成功但条不动」
  * 当成缺陷；不锁滑块，是因为浏览历史时顺手记今天的进度是正当动作，锁定会逼人多切两步筛选。
  */
-function ProgressEditor({ task, view, viewLabel, viewEnd, onPatch, onPreview, disabled }: {
+function ProgressEditor({ task, view, viewLabel, viewEnd, onPatch, onPreview, disabled, history, historyLoading, historyTruncated }: {
   task: GanttTask
   view: PeriodProgress
   viewLabel: string
@@ -1872,6 +2032,9 @@ function ProgressEditor({ task, view, viewLabel, viewEnd, onPatch, onPreview, di
   onPatch: (patch: Partial<GanttTask>) => void
   onPreview?: (patch: Partial<GanttTask>) => void
   disabled?: boolean
+  history?: { at: string; progress: number }[]
+  historyLoading?: boolean
+  historyTruncated?: boolean
 }) {
   const { t } = useTranslation()
   const current = task.progress
@@ -1885,9 +2048,10 @@ function ProgressEditor({ task, view, viewLabel, viewEnd, onPatch, onPreview, di
     setDraft(p)
     if (!disabled) onPatch({ progress: p })
   }, [disabled, onPatch])
+  const resolvedHistory = history ?? task.history
   // 最新一笔流水的日期：服务端直接回传 latestProgressAt；旧后端缺省时才从已带回的流水兜底，
   // 不在前端重算快照值/回退种类
-  const latestAt = task.latestProgressAt ?? (task.history ?? []).reduce<string | null>((m, h) => (m === null || h.at > m ? h.at : m), null)
+  const latestAt = task.latestProgressAt ?? (resolvedHistory ?? []).reduce<string | null>((m, h) => (m === null || h.at > m ? h.at : m), null)
   const showReview = viewEnd !== null && latestAt !== null && latestAt > viewEnd
   // 期末落在今天之前 = 纯历史视图：调整不会改变本视图的进度条，拖动前先看见这句话
   const historyView = viewEnd !== null && viewEnd < fmt(dayjs())
@@ -1928,7 +2092,8 @@ function ProgressEditor({ task, view, viewLabel, viewEnd, onPatch, onPreview, di
           </div>
         </div>
       )}
-      <ProgressHistory history={task.history} current={draft} viewingEnd={showReview ? viewEnd : null} />
+      {historyLoading && <p className="wg-prog-history wg-prog-history--loading">{t('cpm.gantt.progress.historyLoading', { defaultValue: '進度歷史加載中…' })}</p>}
+      {!historyLoading && <ProgressHistory history={resolvedHistory} current={draft} viewingEnd={showReview ? viewEnd : null} truncated={historyTruncated} />}
     </div>
   )
 }
@@ -1946,7 +2111,7 @@ function ProgressEditor({ task, view, viewLabel, viewEnd, onPatch, onPreview, di
  *    误读成「退回到 0」，而且会让人以为那些 0 是真实记录；
  * 3) 只读：它不参与更新进度的提交流程，也不因为人滚到了哪一期就改变当前值。
  */
-function ProgressHistory({ history, current, viewingEnd }: { history?: { at: string; progress: number }[]; current: number; viewingEnd?: string | null }) {
+function ProgressHistory({ history, current, viewingEnd, truncated }: { history?: { at: string; progress: number }[]; current: number; viewingEnd?: string | null; truncated?: boolean }) {
   const { t } = useTranslation()
   const listRef = useRef<HTMLDivElement>(null)
   const weekly = useMemo(() => {
@@ -2020,6 +2185,11 @@ function ProgressHistory({ history, current, viewingEnd }: { history?: { at: str
           )
         })}
       </div>
+      {truncated && (
+        <p className="wg-prog-history__truncated">
+          {t('cpm.gantt.progress.historyTruncated', { defaultValue: '僅顯示最近 400 天進度流水' })}
+        </p>
+      )}
       {/* 当前值与轨迹最后一期不同时必须说出来：那代表今天还没记过一笔，
           不说人就会把表头的 80% 当成弹层里那个 55% 的上周记录 */}
       {last.progress !== current && (
@@ -2077,11 +2247,15 @@ interface RightRowProps {
   onEditNote: (group: GanttGroup, task: GanttTask) => void
   onToggleInserted: (gid: string, task: GanttTask) => void
   onToggleFollowUp: (gid: string, task: GanttTask) => void
+  history?: { at: string; progress: number }[]
+  historyLoading: boolean
+  historyTruncated: boolean
+  onLoadHistory: (id: string) => void
   viewEnd: string | null
   viewLabel: string
 }
 
-const RightRow = memo(function RightRow({ group, meta, data, days, colW, hover, top, firstRow, virtualized, onHover, drag, onDrag, scrollRef, onPatchTask, onPreviewTask, onStartTask, onEndTask, onScheduleTask, onEditNote, onToggleInserted, onToggleFollowUp, viewEnd, viewLabel }: RightRowProps) {
+const RightRow = memo(function RightRow({ group, meta, data, days, colW, hover, top, firstRow, virtualized, onHover, drag, onDrag, scrollRef, onPatchTask, onPreviewTask, onStartTask, onEndTask, onScheduleTask, onEditNote, onToggleInserted, onToggleFollowUp, history, historyLoading, historyTruncated, onLoadHistory, viewEnd, viewLabel }: RightRowProps) {
   const { t } = useTranslation()
   const task = meta.task
   const startXRef = useRef(0)
@@ -2191,6 +2365,7 @@ const RightRow = memo(function RightRow({ group, meta, data, days, colW, hover, 
             // 拖拽结束的 click 不弹详情
             if (movedRef.current) { movedRef.current = false; return }
             setPopOpen(open)
+            if (open && !history?.length) void onLoadHistory(task.id)
           }}
           content={(
             <div className="wg-bar-pop">
@@ -2232,7 +2407,8 @@ const RightRow = memo(function RightRow({ group, meta, data, days, colW, hover, 
                   unCheckedChildren={t('cpm.gantt.follow.none', { defaultValue: '一般' })}
                 />
               </div>
-              <ProgressEditor task={task} view={meta.view} viewLabel={viewLabel} viewEnd={viewEnd} onPatch={patch} onPreview={preview} disabled={!!task.cancelled} />
+              <ProgressEditor task={task} view={meta.view} viewLabel={viewLabel} viewEnd={viewEnd} onPatch={patch} onPreview={preview}
+                disabled={!!task.cancelled} history={history} historyLoading={historyLoading} historyTruncated={historyTruncated} />
               <div className="wg-bar-pop__row"><span>{t('cpm.gantt.pop.note', { defaultValue: '備註' })}</span></div>
               {task.note
                 ? <div className="wg-note-preview" dangerouslySetInnerHTML={{ __html: noteToDisplayHtml(task.note) }} />

@@ -82,12 +82,15 @@ public class CpmSchemaMigrationInitializer implements CommandLineRunner {
     static final String VERSION_SOURCE_MEETING = "cpm:schema:v1.4";
     /** 台账标记维度：跟进/阻塞/原因列；取消复用 status=cancelled，不扩枚举 */
     static final String VERSION_WORKLOG_MARKS = "cpm:schema:v1.5";
+    /** 台账容量窗口：活动任务 + 最近 12 个月关闭任务 + 更早归档游标所需索引 */
+    static final String VERSION_WORKLOG_CAPACITY = "cpm:schema:v1.6";
 
     private static final String SCHEMA_SCRIPT = "336_cpm_core.sql";
     private static final String TIME_SCHEMA_SCRIPT = "337_cpm_time_schema.sql";
     private static final String REVISION_SCHEMA_SCRIPT = "338_cpm_report_revision.sql";
     private static final String WORKLOG_SCHEMA_SCRIPT = "344_cpm_worklog_ledger.sql";
     private static final String WORKLOG_MARKS_SCHEMA_SCRIPT = "346_cpm_worklog_marks.sql";
+    private static final String WORKLOG_CAPACITY_SCHEMA_SCRIPT = "347_cpm_worklog_capacity_indexes.sql";
 
     private static final String SYSTEM_CODE = SystemCode.CPM.code();
     private static final String ADMIN_ROLE_CODE = "admin";
@@ -174,6 +177,7 @@ public class CpmSchemaMigrationInitializer implements CommandLineRunner {
         versionTracker.applyOnce(VERSION_CALENDAR_SEED, this::doCalendarSeed, this::verifyCalendarSeed);
         versionTracker.applyOnce(VERSION_SOURCE_MEETING, this::doSourceMeetingExpand, this::verifySourceMeetingExpand);
         versionTracker.applyOnce(VERSION_WORKLOG_MARKS, this::doWorklogMarksSchema, this::verifyWorklogMarksSchema);
+        versionTracker.applyOnce(VERSION_WORKLOG_CAPACITY, this::doWorklogCapacitySchema, this::verifyWorklogCapacitySchema);
         syncMenuVisibility();
     }
 
@@ -644,6 +648,12 @@ public class CpmSchemaMigrationInitializer implements CommandLineRunner {
             {"biz_cpm_item", "cancel_reason"},
     };
 
+    /** v1.6 容量查询索引：缺任一项都会让窗口/归档按用户数据量放大扫描。 */
+    private static final String[][] WORKLOG_CAPACITY_INDEXES = {
+            {"biz_cpm_item", "idx_cpm_item_user_deleted_status_updated"},
+            {"biz_cpm_item", "idx_cpm_item_user_deleted_plan_start"},
+    };
+
     /**
      * 全局法定名单种子（user_id=0）。
      *
@@ -745,6 +755,27 @@ public class CpmSchemaMigrationInitializer implements CommandLineRunner {
         }
     }
 
+    /** v1.6：容量窗口与归档游标索引；MySQL 无 ADD INDEX IF NOT EXISTS，先查再改。 */
+    private void doWorklogCapacitySchema() {
+        int executed = executeScript(WORKLOG_CAPACITY_SCHEMA_SCRIPT);
+        log.info("持續績效台账容量索引脚本已执行: {} 条语句（{}）", executed, WORKLOG_CAPACITY_SCHEMA_SCRIPT);
+        addIndexIfAbsent("biz_cpm_item", "idx_cpm_item_user_deleted_status_updated",
+                "ALTER TABLE biz_cpm_item ADD INDEX idx_cpm_item_user_deleted_status_updated "
+                        + "(user_id, deleted, status, updated_at)");
+        addIndexIfAbsent("biz_cpm_item", "idx_cpm_item_user_deleted_plan_start",
+                "ALTER TABLE biz_cpm_item ADD INDEX idx_cpm_item_user_deleted_plan_start "
+                        + "(user_id, deleted, plan_start, work_date, id)");
+    }
+
+    private void verifyWorklogCapacitySchema() {
+        for (String[] index : WORKLOG_CAPACITY_INDEXES) {
+            if (!indexExists(index[0], index[1])) {
+                throw new IllegalStateException(index[0] + " 缺少 " + index[1]
+                        + "，台账窗口与归档分页会按用户数据量放大扫描");
+            }
+        }
+    }
+
     private void doCalendarSeed() {
         int inserted = 0;
         for (String date : SEED_HOLIDAYS_2026) {
@@ -828,6 +859,15 @@ public class CpmSchemaMigrationInitializer implements CommandLineRunner {
         }
         jdbcTemplate.execute(ddl);
         log.info("cpm 迁移补列完成: {}.{}", table, column);
+    }
+
+    /** 补索引（MySQL 无 ADD INDEX IF NOT EXISTS）；失败不吞，避免版本记成功而索引长期缺失。 */
+    private void addIndexIfAbsent(String table, String indexName, String ddl) {
+        if (indexExists(table, indexName)) {
+            return;
+        }
+        jdbcTemplate.execute(ddl);
+        log.info("cpm 迁移补索引完成: {}.{}", table, indexName);
     }
 
     /** 约束（含 CHECK / FK）是否已存在且处于强制状态。 */

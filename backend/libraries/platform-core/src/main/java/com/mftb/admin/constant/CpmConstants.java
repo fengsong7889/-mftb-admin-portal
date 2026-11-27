@@ -272,6 +272,14 @@ public final class CpmConstants {
     public static final int GROUP_HUE_MAX = 6;
     /** 台账一次读取的最大天数：季报 92 天，留一倍余量；超限说明调用方在拉全量 */
     public static final int WORKLOG_RANGE_MAX_DAYS = 400;
+    /** 默认“全部”档保留最近 12 个月关闭任务；更早记录只走归档游标，避免历史无限累积压垮页面 */
+    public static final int WORKLOG_ARCHIVE_MONTHS = 12;
+    /** 台账单次最多返回的子任务数；超过即如实返回 truncated，不再静默丢第 2001 条 */
+    public static final int WORKLOG_LEDGER_MAX = 2000;
+    /** 更早归档抽屉默认页大小 */
+    public static final int WORKLOG_ARCHIVE_PAGE_DEFAULT = 100;
+    /** 更早归档抽屉服务端硬上限 */
+    public static final int WORKLOG_ARCHIVE_PAGE_MAX = 200;
     /** 一次性导入本地台账的上限（工作項数 / 单工作項子任务数） */
     public static final int IMPORT_GROUP_MAX = 100;
     public static final int IMPORT_TASK_MAX_PER_GROUP = 200;

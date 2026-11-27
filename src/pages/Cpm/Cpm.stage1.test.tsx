@@ -98,6 +98,11 @@ vi.mock('./worklogApi', async importOriginal => {
     fetchLedger: vi.fn(async () => ({
       data: ledgerStub.current, rangeStart: null, rangeEnd: null, hasUngrouped: false,
     })),
+    fetchTaskHistory: vi.fn(async () => ({ history: [], truncated: false })),
+    fetchLedgerArchive: vi.fn(async () => ({
+      groups: [], loadedTaskCount: 0, matchingTaskCount: 0, truncated: false,
+      hasEarlierArchive: false, earlierArchiveCount: 0, nextCursorDate: null, nextCursorId: null,
+    })),
     createGroup: vi.fn(async () => ({ id: 90, title: '', hue: 0, sortOrder: 0, tasks: [] })),
     createTask: vi.fn(async () => ({ id: 91 })),
     updateTask: vi.fn(async () => ({})),

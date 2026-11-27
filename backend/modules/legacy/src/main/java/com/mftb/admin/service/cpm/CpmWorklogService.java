@@ -61,7 +61,7 @@ public class CpmWorklogService {
 
     /** 虚拟分组 id：未分组条目（旧的日报流水）在台账里汇到这一行下 */
     public static final long UNGROUPED_ID = 0L;
-    /** 台账一次读取的日历窗口：向前 400 天足够覆盖「全部」档的历史排期 */
+    /** 台账一次读取的日历窗口：向前 400 天足够覆盖默认容量窗口内的历史排期 */
     private static final int READ_BACK_DAYS = 400;
 
     private final CpmWorklogGroupMapper groupMapper;
@@ -85,16 +85,30 @@ public class CpmWorklogService {
     /**
      * 一次台账读取：分组 + 子任务 + 区间日历 + 服务端统计。
      *
-     * @param startStr 查询区间起（可空=全部时间）
+     * @param startStr 查询区间起（可空=默认容量窗口）
      * @param endStr   查询区间止（可空）
      */
     public CpmWorklogDto.LedgerVO ledger(String startStr, String endStr) {
+        return ledger(startStr, endStr, null, null, null, null);
+    }
+
+    /** 台账读取：默认只返回活动任务与最近 12 个月关闭任务，更早记录走归档游标。 */
+    public CpmWorklogDto.LedgerVO ledger(String startStr, String endStr, String keyword,
+                                         String status, String planType, Long groupId) {
         SysUser current = guard.currentUser();
         LocalDate from = parseDate(startStr);
         LocalDate to = parseDate(endStr);
         if (from != null && to != null && to.isBefore(from)) {
             throw new BusinessException("查询区间的结束日期早于开始日期");
         }
+        String safeKeyword = keywordForLike(keyword);
+        String safeStatus = ledgerStatusOrThrow(status);
+        String safePlanType = ledgerPlanTypeOrThrow(planType);
+        Long safeGroupId = groupIdOrThrow(groupId);
+        LocalDate windowStart = currentPeriodAnchor().minusMonths(CpmConstants.WORKLOG_ARCHIVE_MONTHS);
+        // 导入后会议被取消的对账必须先于窗口查询：否则刚取消的会还会以活动状态占住默认台账。
+        reconcileCancelledMeetings(current);
+
         LocalDate readFrom = from != null ? from : currentPeriodAnchor().minusDays(READ_BACK_DAYS);
         LocalDate readTo = to != null ? to : currentPeriodAnchor();
         /**
@@ -110,9 +124,19 @@ public class CpmWorklogService {
         LocalDate historyTo = currentPeriodAnchor();
         CpmWorkdays.Ledger calendar = workdays.load(current.getId(), readFrom, readTo);
 
+        List<CpmItem> items = new ArrayList<>(itemMapper.listLedgerWindow(current.getId(), windowStart, from, to,
+                safeKeyword, safeStatus, safePlanType, safeGroupId, CpmConstants.WORKLOG_LEDGER_MAX + 1));
+        int matching = itemMapper.countLedgerWindow(current.getId(), windowStart, from, to,
+                safeKeyword, safeStatus, safePlanType, safeGroupId);
+        if (items.size() > CpmConstants.WORKLOG_LEDGER_MAX) {
+            items = new ArrayList<>(items.subList(0, CpmConstants.WORKLOG_LEDGER_MAX));
+        }
+        // 窗口 SQL 倒序取最近上限条；恢复升序后继续满足台账既有分组/甘特顺序。
+        java.util.Collections.reverse(items);
+
         Map<Long, List<CpmItem>> byGroup = new LinkedHashMap<>();
         List<CpmItem> ungrouped = new ArrayList<>();
-        for (CpmItem item : itemMapper.listLedger(current.getId())) {
+        for (CpmItem item : items) {
             if (item.getGroupId() == null || item.getGroupId() == UNGROUPED_ID) {
                 ungrouped.add(item);
             } else {
@@ -120,14 +144,12 @@ public class CpmWorklogService {
             }
         }
         Map<Long, List<CpmWorklogDto.HistoryVO>> trails = trails(current.getId(), historyFrom, historyTo);
-        // 导入后会议被取消的对账：必须在拼 VO 之前做，否则同一份台账里会一半新一一半旧
-        reconcileCancelledMeetings(current);
         CpmWorklogDto.LedgerVO vo = new CpmWorklogDto.LedgerVO();
         vo.setRangeStart(from == null ? null : from.toString());
         vo.setRangeEnd(to == null ? null : to.toString());
         for (CpmWorklogGroup group : groupMapper.listMine(current.getId())) {
             vo.getGroups().add(toGroupVO(group, byGroup.getOrDefault(group.getId(), List.of()),
-                    calendar, from, to, trails));
+                    calendar, from, to, trails, false));
         }
         if (!ungrouped.isEmpty()) {
             CpmWorklogDto.GroupVO virtual = new CpmWorklogDto.GroupVO();
@@ -135,7 +157,7 @@ public class CpmWorklogService {
             virtual.setTitle(null);
             virtual.setHue(0);
             virtual.setSortOrder(Integer.MAX_VALUE);
-            virtual.setTasks(toTaskVOs(ungrouped, calendar, from, to, trails));
+            virtual.setTasks(toTaskVOs(ungrouped, calendar, from, to, trails, false));
             vo.getGroups().add(virtual);
         }
         vo.setHolidays(calendar.datesOfType(CpmConstants.DAY_TYPE_HOLIDAY, readFrom, readTo));
@@ -143,6 +165,98 @@ public class CpmWorklogService {
         vo.setCompOffs(calendar.datesOfType(CpmConstants.DAY_TYPE_COMP_OFF, readFrom, readTo));
         vo.setLeaves(calendar.datesOfType(CpmConstants.DAY_TYPE_LEAVE, readFrom, readTo));
         vo.setTotals(totals(vo, calendar, from, to));
+        vo.setLoadedTaskCount(items.size());
+        vo.setMatchingTaskCount(matching);
+        vo.setTruncated(matching > CpmConstants.WORKLOG_LEDGER_MAX);
+        if (from == null && to == null) {
+            int archiveCount = itemMapper.countLedgerArchive(current.getId(), windowStart,
+                    safeKeyword, safeStatus, safePlanType, safeGroupId);
+            vo.setEarlierArchiveCount(archiveCount);
+            vo.setHasEarlierArchive(archiveCount > 0);
+        }
+        return vo;
+    }
+
+    /** 更早归档分页：只返回 12 个月前完成/取消记录，使用日期 + id 游标。 */
+    public CpmWorklogDto.LedgerVO archive(String keyword, String status, String planType, Long groupId,
+                                          String cursorDateStr, Long cursorId, Integer limit) {
+        SysUser current = guard.currentUser();
+        String safeKeyword = keywordForLike(keyword);
+        String safeStatus = archiveStatusOrThrow(status);
+        String safePlanType = ledgerPlanTypeOrThrow(planType);
+        Long safeGroupId = groupIdOrThrow(groupId);
+        int pageSize = clampArchiveLimit(limit);
+        LocalDate cursorDate = parseDate(cursorDateStr);
+        if ((cursorDate == null) != (cursorId == null)) {
+            throw new BusinessException("归档游标必须同时提供日期与条目 id");
+        }
+        if (cursorId != null && cursorId <= 0) {
+            throw new BusinessException("归档游标 id 必须为正整数");
+        }
+        LocalDate windowStart = currentPeriodAnchor().minusMonths(CpmConstants.WORKLOG_ARCHIVE_MONTHS);
+        List<CpmItem> rows = new ArrayList<>(itemMapper.listLedgerArchive(current.getId(), windowStart,
+                cursorDate, cursorId, safeKeyword, safeStatus, safePlanType, safeGroupId, pageSize + 1));
+        boolean hasMore = rows.size() > pageSize;
+        if (hasMore) {
+            rows = new ArrayList<>(rows.subList(0, pageSize));
+        }
+        int matching = itemMapper.countLedgerArchive(current.getId(), windowStart,
+                safeKeyword, safeStatus, safePlanType, safeGroupId);
+
+        LocalDate pageFrom = rows.stream().map(CpmWorklogService::ledgerDateOf).min(LocalDate::compareTo)
+                .orElse(currentPeriodAnchor());
+        LocalDate pageTo = rows.stream().map(CpmWorklogService::ledgerDateOf).max(LocalDate::compareTo)
+                .orElse(currentPeriodAnchor());
+        CpmWorkdays.Ledger calendar = workdays.load(current.getId(), pageFrom, pageTo);
+        Map<Long, List<CpmItem>> byGroup = new LinkedHashMap<>();
+        List<CpmItem> ungrouped = new ArrayList<>();
+        for (CpmItem item : rows) {
+            if (item.getGroupId() == null || item.getGroupId() == UNGROUPED_ID) {
+                ungrouped.add(item);
+            } else {
+                byGroup.computeIfAbsent(item.getGroupId(), k -> new ArrayList<>()).add(item);
+            }
+        }
+        CpmWorklogDto.LedgerVO vo = new CpmWorklogDto.LedgerVO();
+        for (CpmWorklogGroup group : groupMapper.listMine(current.getId())) {
+            vo.getGroups().add(toGroupVO(group, byGroup.getOrDefault(group.getId(), List.of()),
+                    calendar, null, null, Map.of(), false));
+        }
+        if (!ungrouped.isEmpty()) {
+            CpmWorklogDto.GroupVO virtual = new CpmWorklogDto.GroupVO();
+            virtual.setId(UNGROUPED_ID);
+            virtual.setTitle(null);
+            virtual.setHue(0);
+            virtual.setSortOrder(Integer.MAX_VALUE);
+            virtual.setTasks(toTaskVOs(ungrouped, calendar, null, null, Map.of(), false));
+            vo.getGroups().add(virtual);
+        }
+        vo.setTotals(totals(vo, calendar, null, null));
+        vo.setLoadedTaskCount(rows.size());
+        vo.setMatchingTaskCount(matching);
+        vo.setTruncated(hasMore);
+        vo.setHasEarlierArchive(matching > 0);
+        vo.setEarlierArchiveCount(matching);
+        if (!rows.isEmpty()) {
+            CpmItem last = rows.get(rows.size() - 1);
+            vo.setNextCursorDate(ledgerDateOf(last).toString());
+            vo.setNextCursorId(last.getId());
+        }
+        return vo;
+    }
+
+    /** 单条任务进度历史：只在打开进度弹层时读取最近 400 天。 */
+    public CpmWorklogDto.HistoryPageVO taskHistory(long id) {
+        SysUser current = guard.currentUser();
+        guard.requireOwnedItem(id, current);
+        LocalDate to = currentPeriodAnchor();
+        LocalDate from = to.minusDays(READ_BACK_DAYS);
+        List<CpmItemUpdate> rows = updateMapper.listByItemInRange(id, from, to);
+        int matching = updateMapper.countByItemInRange(id, from, to);
+        CpmWorklogDto.HistoryPageVO vo = new CpmWorklogDto.HistoryPageVO();
+        vo.setHistory(rows.stream().map(row -> new CpmWorklogDto.HistoryVO(
+                row.getUpdateDate().toString(), row.getProgress() == null ? 0 : row.getProgress())).toList());
+        vo.setTruncated(matching > rows.size());
         return vo;
     }
 
@@ -292,7 +406,7 @@ public class CpmWorklogService {
         }
         appendTrail(item, current);
         return taskVO(item, workdays.load(current.getId(), itemPeriodFrom(item), currentPeriodAnchor().plusYears(1)),
-                null, null, Map.of());
+                null, null, Map.of(), true);
     }
 
     @Transactional
@@ -376,7 +490,7 @@ public class CpmWorklogService {
         }
         return taskVO(itemMapper.selectAliveById(id),
                 workdays.load(current.getId(), start != null ? start : itemPeriodFrom(item),
-                        currentPeriodAnchor().plusYears(1)), null, null, Map.of());
+                        currentPeriodAnchor().plusYears(1)), null, null, Map.of(), true);
     }
 
     @Transactional
@@ -403,7 +517,7 @@ public class CpmWorklogService {
         }
         CpmItem fresh = itemMapper.selectAliveById(id);
         return taskVO(fresh, workdays.load(current.getId(), itemPeriodFrom(fresh),
-                currentPeriodAnchor().plusYears(1)), null, null, Map.of());
+                currentPeriodAnchor().plusYears(1)), null, null, Map.of(), true);
     }
 
     @Transactional
@@ -543,10 +657,7 @@ public class CpmWorklogService {
         validateRange(start, end);
         String title = requireTitle(task.getTitle());
         // 同工作項下同名同起日的子任务视为已导入：重复点按钮不该长出两行一样的事实
-        boolean already = itemMapper.listLedger(current.getId()).stream().anyMatch(i ->
-                i.getGroupId() != null && i.getGroupId() == groupId
-                        && title.equals(i.getTitle())
-                        && java.util.Objects.equals(i.getPlanStart(), start));
+        boolean already = itemMapper.countLedgerDuplicate(current.getId(), groupId, title, start) > 0;
         if (already) {
             return false;
         }
@@ -643,9 +754,10 @@ public class CpmWorklogService {
 
     private CpmWorklogDto.GroupVO toGroupVO(CpmWorklogGroup group, List<CpmItem> tasks,
                                             CpmWorkdays.Ledger calendar, LocalDate from, LocalDate to,
-                                            Map<Long, List<CpmWorklogDto.HistoryVO>> trails) {
+                                            Map<Long, List<CpmWorklogDto.HistoryVO>> trails,
+                                            boolean includeHistory) {
         CpmWorklogDto.GroupVO vo = groupVO(group);
-        vo.setTasks(toTaskVOs(tasks, calendar, from, to, trails));
+        vo.setTasks(toTaskVOs(tasks, calendar, from, to, trails, includeHistory));
         return vo;
     }
 
@@ -661,17 +773,19 @@ public class CpmWorklogService {
 
     private List<CpmWorklogDto.TaskVO> toTaskVOs(List<CpmItem> items, CpmWorkdays.Ledger calendar,
                                                  LocalDate from, LocalDate to,
-                                                 Map<Long, List<CpmWorklogDto.HistoryVO>> trails) {
+                                                 Map<Long, List<CpmWorklogDto.HistoryVO>> trails,
+                                                 boolean includeHistory) {
         List<CpmWorklogDto.TaskVO> out = new ArrayList<>();
         for (CpmItem item : items) {
-            out.add(taskVO(item, calendar, from, to, trails));
+            out.add(taskVO(item, calendar, from, to, trails, includeHistory));
         }
         return out;
     }
 
     private CpmWorklogDto.TaskVO taskVO(CpmItem item, CpmWorkdays.Ledger calendar,
                                         LocalDate from, LocalDate to,
-                                        Map<Long, List<CpmWorklogDto.HistoryVO>> trails) {
+                                        Map<Long, List<CpmWorklogDto.HistoryVO>> trails,
+                                        boolean includeHistory) {
         CpmWorklogDto.TaskVO vo = new CpmWorklogDto.TaskVO();
         vo.setId(item.getId());
         vo.setGroupId(item.getGroupId() == null ? UNGROUPED_ID : item.getGroupId());
@@ -721,7 +835,7 @@ public class CpmWorklogService {
         vo.setSourceType(item.getSourceType());
         vo.setSourceRef(item.getSourceRef());
         vo.setRdmSyncEnabled(item.getRdmSyncEnabled());
-        if (trails != null && item.getId() != null) {
+        if (includeHistory && trails != null && item.getId() != null) {
             vo.setHistory(history);
         }
         return vo;
@@ -1001,6 +1115,70 @@ public class CpmWorklogService {
             return false;
         }
         return !end.isBefore(from) && !start.isAfter(to);
+    }
+
+    /** 台账/归档排序日期：计划起日优先，未排期回退首次记录日。 */
+    private static LocalDate ledgerDateOf(CpmItem item) {
+        return item.getPlanStart() != null ? item.getPlanStart() : item.getWorkDate();
+    }
+
+    /** 关键词转 LIKE 参数；空串归 null，避免把「无筛选」误写成匹配空字符串。 */
+    private static String keywordForLike(String keyword) {
+        if (!StringUtils.hasText(keyword)) {
+            return null;
+        }
+        String trimmed = keyword.trim();
+        if (trimmed.isEmpty()) {
+            return null;
+        }
+        return trimmed.replace("!", "!!").replace("%", "!%").replace("_", "!_");
+    }
+
+    private static String ledgerStatusOrThrow(String status) {
+        if (!StringUtils.hasText(status)) {
+            return null;
+        }
+        String value = status.trim();
+        if (!value.equals("all") && !Set.of("todo", "doing", "done", "cancelled", "plan").contains(value)) {
+            throw new BusinessException("不支持的台账状态筛选");
+        }
+        return value.equals("all") ? null : value;
+    }
+
+    private static String archiveStatusOrThrow(String status) {
+        String value = ledgerStatusOrThrow(status);
+        if (value != null && !value.equals("done") && !value.equals("cancelled")) {
+            throw new BusinessException("更早归档只支持已完成与已取消筛选");
+        }
+        return value;
+    }
+
+    private static String ledgerPlanTypeOrThrow(String planType) {
+        if (!StringUtils.hasText(planType)) {
+            return null;
+        }
+        String value = planType.trim();
+        if (value.equals("all")) {
+            return null;
+        }
+        if (value.equals("follow") || CpmConstants.PLAN_TYPES.contains(value)) {
+            return value;
+        }
+        throw new BusinessException("不支持的计划属性筛选");
+    }
+
+    private static Long groupIdOrThrow(Long groupId) {
+        if (groupId != null && groupId < 0) {
+            throw new BusinessException("工作項筛选 id 不合法");
+        }
+        return groupId;
+    }
+
+    private static int clampArchiveLimit(Integer limit) {
+        if (limit == null) {
+            return CpmConstants.WORKLOG_ARCHIVE_PAGE_DEFAULT;
+        }
+        return Math.max(1, Math.min(CpmConstants.WORKLOG_ARCHIVE_PAGE_MAX, limit));
     }
 
     private LocalDate itemPeriodFrom(CpmItem item) {

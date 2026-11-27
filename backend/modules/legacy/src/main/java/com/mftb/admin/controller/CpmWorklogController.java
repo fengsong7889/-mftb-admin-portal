@@ -57,9 +57,28 @@ public class CpmWorklogController {
     @RequirePermission(menu = MY, action = VIEW)
     public Result<CpmWorklogDto.LedgerVO> ledger(@RequestParam(required = false) String start,
                                                  @RequestParam(required = false) String end,
+                                                 @RequestParam(required = false) String keyword,
+                                                 @RequestParam(required = false) String status,
+                                                 @RequestParam(required = false) String planType,
+                                                 @RequestParam(required = false) Long groupId,
                                                  HttpServletResponse response) {
         noStore(response);
-        return Result.success(worklogService.ledger(start, end));
+        return Result.success(worklogService.ledger(start, end, keyword, status, planType, groupId));
+    }
+
+    @GetMapping("/ledger/archive")
+    @RequirePermission(menu = MY, action = VIEW)
+    public Result<CpmWorklogDto.LedgerVO> archive(@RequestParam(required = false) String keyword,
+                                                  @RequestParam(required = false) String status,
+                                                  @RequestParam(required = false) String planType,
+                                                  @RequestParam(required = false) Long groupId,
+                                                  @RequestParam(required = false) String cursorDate,
+                                                  @RequestParam(required = false) Long cursorId,
+                                                  @RequestParam(required = false) Integer limit,
+                                                  HttpServletResponse response) {
+        noStore(response);
+        return Result.success(worklogService.archive(keyword, status, planType, groupId,
+                cursorDate, cursorId, limit));
     }
 
     @PostMapping("/groups")
@@ -139,6 +158,15 @@ public class CpmWorklogController {
                                                      HttpServletResponse response) {
         noStore(response);
         return Result.success("已恢復", worklogService.restoreState(id));
+    }
+
+    /** 进度弹层打开时才读取单条任务流水；列表响应不再批量携带全部历史。 */
+    @GetMapping("/tasks/{id}/history")
+    @RequirePermission(menu = MY, action = VIEW)
+    public Result<CpmWorklogDto.HistoryPageVO> taskHistory(@PathVariable("id") long id,
+                                                           HttpServletResponse response) {
+        noStore(response);
+        return Result.success(worklogService.taskHistory(id));
     }
 
     /* ==================== 工时口径日历 ==================== */

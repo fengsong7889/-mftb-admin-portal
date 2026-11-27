@@ -18381,11 +18381,14 @@
         "title": "No records match the filters"
       },
       "export": {
+        "at": "Exported {{time}}",
+        "content": "Work Content",
         "csv": "Excel sheet (CSV)",
         "failed": "Export failed, please retry",
         "fileBase": "MyWorkLog_{{date}}",
         "imageDone": "Downloaded the long-image snapshot of the current ledger",
-        "pdfDone": "Downloaded the A4 paginated PDF of the current ledger"
+        "pdfDone": "Downloaded the A4 paginated PDF of the current ledger",
+        "titleAll": "All ({{start}} ~ {{end}})"
       },
       "hours": {
         "tip": "{{days}} workdays × {{hours}}h = {{hours}}h (weekends/holidays excluded) · click to edit",
@@ -18432,7 +18435,8 @@
         "restored": "Restored; task is editable",
         "reasonRequired": "Reason is required",
         "blocked": "Marked as blocked; progress and notes remain editable",
-        "cancelled": "Task cancelled; editing frozen. Only delete or restore is available."
+        "cancelled": "Task cancelled; editing frozen. Only delete or restore is available.",
+        "historyFailed": "Failed to load progress history"
       },
       "newItemTitle": "New work item",
       "note": {
@@ -18551,10 +18555,25 @@
         "item": " items",
         "percent": "%"
       },
+      "capacity": {
+        "truncated": "Loaded {{loaded}} of {{matching}} items in this query",
+        "truncatedDesc": "Only the most recent records are loaded to keep the page responsive. Narrow the date range or open the earlier archive.",
+        "openArchive": "View earlier archive"
+      },
       "list": {
         "end": "All {{count}} subtasks shown",
         "atEnd": "End of list · {{count}} items",
-        "more": "Scroll down for more"
+        "more": "Scroll down for more",
+        "recentEnd": "{{loaded}} recent items loaded · {{earlier}} earlier archived items",
+        "openArchive": "View earlier archive",
+        "hasArchive": "{{count}} earlier archived items"
+      },
+      "archive": {
+        "title": "Earlier Archived Records",
+        "loadFailed": "Failed to load the earlier archive",
+        "summary": "Loaded {{loaded}} of {{matching}} archived items",
+        "loadMore": "Load more archived items",
+        "end": "All archived items loaded ({{count}} items)"
       },
       "tabbar": {
         "summary": "{{tasks}} subtasks · {{workdays}} workdays",
@@ -18589,6 +18608,8 @@
       "progress": {
         "historyDelta": "{{value}}% vs last week",
         "historyNow": "Now at {{value}}%, not yet saved as a new weekly record",
+        "historyLoading": "Loading progress history...",
+        "historyTruncated": "Showing progress updates from the last 400 days only",
         "historyTitle": "Progress by week",
         "historyViewTip": "Past periods show a snapshot only; the bar will not move with adjustments. Your latest progress is saved - switch to \"All\" or a period that includes today to see it.",
         "noHistory": "No progress updates yet",

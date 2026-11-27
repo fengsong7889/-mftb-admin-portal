@@ -137,15 +137,138 @@ public interface CpmItemMapper extends BaseMapper<CpmItem> {
     /* ==================== 台账（cpm:schema:v1.3） ==================== */
 
     /**
-     * 台账一次读回本人全部未删条目（分组与未分组都要）。
+     * 台账默认窗口：活动任务全量保留，完成/取消任务只保留窗口起点之后更新的记录。
      *
-     * <p>刻意不按分组过滤也不按日期过滤：台账的「全部」档要看历史全量，
-     * 日期档在前端/服务层再筛；上限 2000 行是防止有人把这张表当数据仓库拉，
-     * 真到那个量级应该先做归档而不是先把列宽拉大。
+     * <p>SQL 按日期倒序取最近 limit 条，服务层再恢复升序；这样达到上限时截掉的是最早记录，
+     * 不会再让新增任务因为旧 LIMIT 静默消失。
      */
+    @Select("<script>SELECT * FROM biz_cpm_item WHERE deleted = 0 AND user_id = #{userId} "
+            + "AND ((status NOT IN ('done','cancelled') AND progress &lt; 100) "
+            + "OR ((status IN ('done','cancelled') OR progress >= 100) AND updated_at >= #{windowStart})) "
+            + "<if test='rangeFrom != null and rangeTo != null'>"
+            + "AND plan_start IS NOT NULL AND plan_end IS NOT NULL "
+            + "AND plan_start &lt;= #{rangeTo} AND plan_end >= #{rangeFrom} </if>"
+            + "<if test='keyword != null'>AND (title LIKE CONCAT('%', #{keyword}, '%') ESCAPE '!' "
+            + "OR note_text LIKE CONCAT('%', #{keyword}, '%') ESCAPE '!') </if>"
+            + "<if test='status != null'>"
+            + "<choose>"
+            + "<when test='status.equals(\"done\")'>AND status &lt;&gt; 'cancelled' AND progress >= 100 </when>"
+            + "<when test='status.equals(\"doing\")'>AND status &lt;&gt; 'cancelled' AND progress > 0 AND progress &lt; 100 AND plan_start IS NOT NULL AND plan_end IS NOT NULL </when>"
+            + "<when test='status.equals(\"todo\")'>AND status &lt;&gt; 'cancelled' AND progress = 0 AND plan_start IS NOT NULL AND plan_end IS NOT NULL </when>"
+            + "<when test='status.equals(\"plan\")'>AND status &lt;&gt; 'cancelled' AND (plan_start IS NULL OR plan_end IS NULL) </when>"
+            + "<when test='status.equals(\"cancelled\")'>AND status = 'cancelled' </when>"
+            + "</choose></if>"
+            + "<if test='planType != null'>"
+            + "<choose>"
+            + "<when test='planType.equals(\"follow\")'>AND follow_up = 1 </when>"
+            + "<otherwise>AND plan_type = #{planType} </otherwise>"
+            + "</choose></if>"
+            + "<if test='groupId != null'>"
+            + "<choose><when test='groupId == 0'>AND (group_id IS NULL OR group_id = 0) </when>"
+            + "<otherwise>AND group_id = #{groupId} </otherwise></choose></if>"
+            + "ORDER BY COALESCE(plan_start, work_date) DESC, id DESC LIMIT #{limit}</script>")
+    List<CpmItem> listLedgerWindow(@Param("userId") long userId, @Param("windowStart") LocalDate windowStart,
+                                   @Param("rangeFrom") LocalDate rangeFrom, @Param("rangeTo") LocalDate rangeTo,
+                                   @Param("keyword") String keyword, @Param("status") String status,
+                                   @Param("planType") String planType, @Param("groupId") Long groupId,
+                                   @Param("limit") int limit);
+
+    /** 与窗口查询同一条件的总数，用于如实告诉用户“已载入 N / 当前口径 M”。 */
+    @Select("<script>SELECT COUNT(*) FROM biz_cpm_item WHERE deleted = 0 AND user_id = #{userId} "
+            + "AND ((status NOT IN ('done','cancelled') AND progress &lt; 100) "
+            + "OR ((status IN ('done','cancelled') OR progress >= 100) AND updated_at >= #{windowStart})) "
+            + "<if test='rangeFrom != null and rangeTo != null'>"
+            + "AND plan_start IS NOT NULL AND plan_end IS NOT NULL "
+            + "AND plan_start &lt;= #{rangeTo} AND plan_end >= #{rangeFrom} </if>"
+            + "<if test='keyword != null'>AND (title LIKE CONCAT('%', #{keyword}, '%') ESCAPE '!' "
+            + "OR note_text LIKE CONCAT('%', #{keyword}, '%') ESCAPE '!') </if>"
+            + "<if test='status != null'>"
+            + "<choose>"
+            + "<when test='status.equals(\"done\")'>AND status &lt;&gt; 'cancelled' AND progress >= 100 </when>"
+            + "<when test='status.equals(\"doing\")'>AND status &lt;&gt; 'cancelled' AND progress > 0 AND progress &lt; 100 AND plan_start IS NOT NULL AND plan_end IS NOT NULL </when>"
+            + "<when test='status.equals(\"todo\")'>AND status &lt;&gt; 'cancelled' AND progress = 0 AND plan_start IS NOT NULL AND plan_end IS NOT NULL </when>"
+            + "<when test='status.equals(\"plan\")'>AND status &lt;&gt; 'cancelled' AND (plan_start IS NULL OR plan_end IS NULL) </when>"
+            + "<when test='status.equals(\"cancelled\")'>AND status = 'cancelled' </when>"
+            + "</choose></if>"
+            + "<if test='planType != null'>"
+            + "<choose>"
+            + "<when test='planType.equals(\"follow\")'>AND follow_up = 1 </when>"
+            + "<otherwise>AND plan_type = #{planType} </otherwise>"
+            + "</choose></if>"
+            + "<if test='groupId != null'>"
+            + "<choose><when test='groupId == 0'>AND (group_id IS NULL OR group_id = 0) </when>"
+            + "<otherwise>AND group_id = #{groupId} </otherwise></choose></if></script>")
+    int countLedgerWindow(@Param("userId") long userId, @Param("windowStart") LocalDate windowStart,
+                          @Param("rangeFrom") LocalDate rangeFrom, @Param("rangeTo") LocalDate rangeTo,
+                          @Param("keyword") String keyword, @Param("status") String status,
+                          @Param("planType") String planType, @Param("groupId") Long groupId);
+
+    /** 更早归档：只查窗口起点之前完成/取消的记录，使用日期 + id 游标避免 OFFSET 漂移。 */
+    @Select("<script>SELECT * FROM biz_cpm_item WHERE deleted = 0 AND user_id = #{userId} "
+            + "AND (status IN ('done','cancelled') OR progress >= 100) AND updated_at &lt; #{windowStart} "
+            + "<if test='cursorDate != null and cursorId != null'>"
+            + "AND (COALESCE(plan_start, work_date) &lt; #{cursorDate} "
+            + "OR (COALESCE(plan_start, work_date) = #{cursorDate} AND id &lt; #{cursorId})) </if>"
+            + "<if test='keyword != null'>AND (title LIKE CONCAT('%', #{keyword}, '%') ESCAPE '!' "
+            + "OR note_text LIKE CONCAT('%', #{keyword}, '%') ESCAPE '!') </if>"
+            + "<if test='status != null'>"
+            + "<choose>"
+            + "<when test='status.equals(\"done\")'>AND status &lt;&gt; 'cancelled' AND progress >= 100 </when>"
+            + "<when test='status.equals(\"cancelled\")'>AND status = 'cancelled' </when>"
+            + "<otherwise>AND 1 = 0 </otherwise>"
+            + "</choose></if>"
+            + "<if test='planType != null'>"
+            + "<choose>"
+            + "<when test='planType.equals(\"follow\")'>AND follow_up = 1 </when>"
+            + "<otherwise>AND plan_type = #{planType} </otherwise>"
+            + "</choose></if>"
+            + "<if test='groupId != null'>"
+            + "<choose><when test='groupId == 0'>AND (group_id IS NULL OR group_id = 0) </when>"
+            + "<otherwise>AND group_id = #{groupId} </otherwise></choose></if>"
+            + "ORDER BY COALESCE(plan_start, work_date) DESC, id DESC LIMIT #{limit}</script>")
+    List<CpmItem> listLedgerArchive(@Param("userId") long userId, @Param("windowStart") LocalDate windowStart,
+                                    @Param("cursorDate") LocalDate cursorDate, @Param("cursorId") Long cursorId,
+                                    @Param("keyword") String keyword, @Param("status") String status,
+                                    @Param("planType") String planType, @Param("groupId") Long groupId,
+                                    @Param("limit") int limit);
+
+    /** 与归档列表同一条件的总数。 */
+    @Select("<script>SELECT COUNT(*) FROM biz_cpm_item WHERE deleted = 0 AND user_id = #{userId} "
+            + "AND (status IN ('done','cancelled') OR progress >= 100) AND updated_at &lt; #{windowStart} "
+            + "<if test='keyword != null'>AND (title LIKE CONCAT('%', #{keyword}, '%') ESCAPE '!' "
+            + "OR note_text LIKE CONCAT('%', #{keyword}, '%') ESCAPE '!') </if>"
+            + "<if test='status != null'>"
+            + "<choose>"
+            + "<when test='status.equals(\"done\")'>AND status &lt;&gt; 'cancelled' AND progress >= 100 </when>"
+            + "<when test='status.equals(\"cancelled\")'>AND status = 'cancelled' </when>"
+            + "<otherwise>AND 1 = 0 </otherwise>"
+            + "</choose></if>"
+            + "<if test='planType != null'>"
+            + "<choose>"
+            + "<when test='planType.equals(\"follow\")'>AND follow_up = 1 </when>"
+            + "<otherwise>AND plan_type = #{planType} </otherwise>"
+            + "</choose></if>"
+            + "<if test='groupId != null'>"
+            + "<choose><when test='groupId == 0'>AND (group_id IS NULL OR group_id = 0) </when>"
+            + "<otherwise>AND group_id = #{groupId} </otherwise></choose></if></script>")
+    int countLedgerArchive(@Param("userId") long userId, @Param("windowStart") LocalDate windowStart,
+                           @Param("keyword") String keyword, @Param("status") String status,
+                           @Param("planType") String planType, @Param("groupId") Long groupId);
+
+    /** 汇报/导入去重仍需读取全部事实；台账页面不再消费这个无界查询。 */
     @Select("SELECT * FROM biz_cpm_item WHERE deleted = 0 AND user_id = #{userId} "
-            + "ORDER BY COALESCE(plan_start, work_date) ASC, id ASC LIMIT 2000")
-    List<CpmItem> listLedger(@Param("userId") long userId);
+            + "ORDER BY COALESCE(plan_start, work_date) ASC, id ASC")
+    List<CpmItem> listAllForUser(@Param("userId") long userId);
+
+    /** 导入会议去重：按工作项、标题与计划起日精确查，不能依赖有界台账窗口漏判。 */
+    @Select("<script>SELECT COUNT(*) FROM biz_cpm_item WHERE deleted = 0 AND user_id = #{userId} "
+            + "AND title = #{title} "
+            + "<choose><when test='groupId == null or groupId == 0'>AND (group_id IS NULL OR group_id = 0) </when>"
+            + "<otherwise>AND group_id = #{groupId} </otherwise></choose>"
+            + "<choose><when test='planStart == null'>AND plan_start IS NULL </when>"
+            + "<otherwise>AND plan_start = #{planStart} </otherwise></choose></script>")
+    int countLedgerDuplicate(@Param("userId") long userId, @Param("groupId") Long groupId,
+                             @Param("title") String title, @Param("planStart") LocalDate planStart);
 
     /** 台账字段更新：带归属人与乐观锁，version 不符影响 0 行由服务层转「请刷新重试」。 */
     @Update("<script>UPDATE biz_cpm_item SET"

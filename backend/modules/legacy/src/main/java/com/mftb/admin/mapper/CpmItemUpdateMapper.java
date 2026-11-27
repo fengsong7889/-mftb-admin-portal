@@ -23,6 +23,18 @@ public interface CpmItemUpdateMapper extends BaseMapper<CpmItemUpdate> {
     @Select("SELECT * FROM biz_cpm_item_update WHERE item_id = #{itemId} ORDER BY update_date ASC, id ASC")
     List<CpmItemUpdate> listByItem(@Param("itemId") long itemId);
 
+    /** 单条任务进度历史懒加载：只读窗口内流水，避免打开弹层时把多年记录一次拉回。 */
+    @Select("SELECT * FROM biz_cpm_item_update WHERE item_id = #{itemId} "
+            + "AND update_date >= #{start} AND update_date <= #{end} ORDER BY update_date ASC, id ASC")
+    List<CpmItemUpdate> listByItemInRange(@Param("itemId") long itemId,
+                                          @Param("start") LocalDate start, @Param("end") LocalDate end);
+
+    /** 与窗口查询同条件的总数，用于如实返回 truncated。 */
+    @Select("SELECT COUNT(*) FROM biz_cpm_item_update WHERE item_id = #{itemId} "
+            + "AND update_date >= #{start} AND update_date <= #{end}")
+    int countByItemInRange(@Param("itemId") long itemId,
+                           @Param("start") LocalDate start, @Param("end") LocalDate end);
+
     /** 期间内该用户全部条目流水（周报聚合轨迹来源，一次取全避免 N+1）。 */
     @Select("SELECT u.* FROM biz_cpm_item_update u JOIN biz_cpm_item i ON i.id = u.item_id "
             + "WHERE i.user_id = #{userId} AND i.deleted = 0 AND u.update_date >= #{start} AND u.update_date <= #{end} "
