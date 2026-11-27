@@ -134,6 +134,16 @@ public class SchemaContractValidator implements CommandLineRunner {
                     }
                 }
             }
+            for (ContractSpec.IndexSpec index : spec.requiredIndexes()) {
+                if (!indexExists(spec.table(), index.index())) {
+                    if (index.healable()) {
+                        log.warn("索引 {}.{} 缺失，执行自愈补索引", spec.table(), index.index());
+                        jdbcTemplate.execute(index.addIndexDdl());
+                    } else {
+                        drift.add("索引缺失且无自愈定义: " + spec.table() + "." + index.index());
+                    }
+                }
+            }
         }
         // 自愈后复核（确认 DDL 真的生效）
         return revalidate(contracts, drift);
@@ -152,6 +162,11 @@ public class SchemaContractValidator implements CommandLineRunner {
                     remaining.add("自愈后列仍缺失: " + spec.table() + "." + col.column());
                 }
             }
+            for (ContractSpec.IndexSpec index : spec.requiredIndexes()) {
+                if (!indexExists(spec.table(), index.index())) {
+                    remaining.add("自愈后索引仍缺失: " + spec.table() + "." + index.index());
+                }
+            }
         }
         // 合并自愈前判定为不可修复的漂移
         remaining.addAll(alreadyDrift.stream().filter(d -> d.contains("无自愈定义")).toList());
@@ -164,6 +179,10 @@ public class SchemaContractValidator implements CommandLineRunner {
 
     private boolean columnExists(String table, String column) {
         return SchemaContractChecker.columnExists(jdbcTemplate, table, column);
+    }
+
+    private boolean indexExists(String table, String index) {
+        return SchemaContractChecker.indexExists(jdbcTemplate, table, index);
     }
 
     private String lockName() {

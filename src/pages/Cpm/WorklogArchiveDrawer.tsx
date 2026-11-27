@@ -49,9 +49,11 @@ export default function WorklogArchiveDrawer({ open, query, onClose }: WorklogAr
       })))
       setRows(current => reset ? page : [...current, ...page])
       setMatching(result.matchingTaskCount)
-      setCursor(result.nextCursorDate && result.nextCursorId
-        ? { date: result.nextCursorDate, id: result.nextCursorId }
-        : null)
+      const next = result.archiveCursor
+        ?? (result.nextCursorDate && result.nextCursorId
+          ? { date: result.nextCursorDate, id: result.nextCursorId }
+          : null)
+      setCursor(next)
     } catch (e) {
       setError(e instanceof Error ? e.message : t('cpm.gantt.archive.loadFailed', { defaultValue: '更早歸檔載入失敗' }))
     } finally {
@@ -115,6 +117,7 @@ export default function WorklogArchiveDrawer({ open, query, onClose }: WorklogAr
         scroll={{ x: 'max-content' }}
       />
       <div className="wg-archive-footer">
+        <Button onClick={onClose}>{t('cpm.gantt.archive.backToLedger', { defaultValue: '返回台账' })}</Button>
         {cursor && rows.length < matching && (
           <Button loading={loading} onClick={() => void load(false)}>
             {t('cpm.gantt.archive.loadMore', { defaultValue: '載入更多更早記錄' })}

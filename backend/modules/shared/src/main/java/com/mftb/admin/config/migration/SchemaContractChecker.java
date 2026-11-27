@@ -26,6 +26,11 @@ final class SchemaContractChecker {
                     drift.add("列不存在: " + spec.table() + "." + col.column());
                 }
             }
+            for (ContractSpec.IndexSpec index : spec.requiredIndexes()) {
+                if (!indexExists(jdbcTemplate, spec.table(), index.index())) {
+                    drift.add("索引不存在: " + spec.table() + "." + index.index());
+                }
+            }
         }
         return drift;
     }
@@ -43,6 +48,14 @@ final class SchemaContractChecker {
                 "SELECT COUNT(*) FROM information_schema.COLUMNS "
                         + "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?",
                 Integer.class, table, column);
+        return count != null && count > 0;
+    }
+
+    static boolean indexExists(JdbcTemplate jdbcTemplate, String table, String index) {
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(DISTINCT INDEX_NAME) FROM information_schema.STATISTICS "
+                        + "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND INDEX_NAME = ?",
+                Integer.class, table, index);
         return count != null && count > 0;
     }
 }

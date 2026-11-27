@@ -148,6 +148,15 @@ public final class CpmWorklogDto {
         /** 归档游标页的下一页起点；普通台账读取为空。 */
         private String nextCursorDate;
         private Long nextCursorId;
+        /** Spec 契约中的统一游标对象；nextCursorDate/Id 保留给旧前端兼容。 */
+        private ArchiveCursorVO archiveCursor;
+    }
+
+    /** 归档下一页游标：日期 + 条目 id 必须成对出现。 */
+    @Data
+    public static class ArchiveCursorVO {
+        private String date;
+        private Long id;
     }
 
     /** 单条任务进度历史：打开弹层时才读取，列表不再批量携带全部流水。 */

@@ -143,11 +143,13 @@ public interface CpmItemMapper extends BaseMapper<CpmItem> {
      * 不会再让新增任务因为旧 LIMIT 静默消失。
      */
     @Select("<script>SELECT * FROM biz_cpm_item WHERE deleted = 0 AND user_id = #{userId} "
+            + "<if test='rangeFrom == null and rangeTo == null'>"
             + "AND ((status NOT IN ('done','cancelled') AND progress &lt; 100) "
-            + "OR ((status IN ('done','cancelled') OR progress >= 100) AND updated_at >= #{windowStart})) "
-            + "<if test='rangeFrom != null and rangeTo != null'>"
+            + "OR ((status IN ('done','cancelled') OR progress >= 100) AND updated_at >= #{windowStart})) </if>"
+            + "<if test='rangeFrom != null or rangeTo != null'>"
             + "AND plan_start IS NOT NULL AND plan_end IS NOT NULL "
-            + "AND plan_start &lt;= #{rangeTo} AND plan_end >= #{rangeFrom} </if>"
+            + "<if test='rangeFrom != null'>AND plan_end &gt;= #{rangeFrom}</if> "
+            + "<if test='rangeTo != null'>AND plan_start &lt;= #{rangeTo}</if> </if>"
             + "<if test='keyword != null'>AND (title LIKE CONCAT('%', #{keyword}, '%') ESCAPE '!' "
             + "OR note_text LIKE CONCAT('%', #{keyword}, '%') ESCAPE '!') </if>"
             + "<if test='status != null'>"
@@ -175,11 +177,13 @@ public interface CpmItemMapper extends BaseMapper<CpmItem> {
 
     /** 与窗口查询同一条件的总数，用于如实告诉用户“已载入 N / 当前口径 M”。 */
     @Select("<script>SELECT COUNT(*) FROM biz_cpm_item WHERE deleted = 0 AND user_id = #{userId} "
+            + "<if test='rangeFrom == null and rangeTo == null'>"
             + "AND ((status NOT IN ('done','cancelled') AND progress &lt; 100) "
-            + "OR ((status IN ('done','cancelled') OR progress >= 100) AND updated_at >= #{windowStart})) "
-            + "<if test='rangeFrom != null and rangeTo != null'>"
+            + "OR ((status IN ('done','cancelled') OR progress >= 100) AND updated_at >= #{windowStart})) </if>"
+            + "<if test='rangeFrom != null or rangeTo != null'>"
             + "AND plan_start IS NOT NULL AND plan_end IS NOT NULL "
-            + "AND plan_start &lt;= #{rangeTo} AND plan_end >= #{rangeFrom} </if>"
+            + "<if test='rangeFrom != null'>AND plan_end &gt;= #{rangeFrom}</if> "
+            + "<if test='rangeTo != null'>AND plan_start &lt;= #{rangeTo}</if> </if>"
             + "<if test='keyword != null'>AND (title LIKE CONCAT('%', #{keyword}, '%') ESCAPE '!' "
             + "OR note_text LIKE CONCAT('%', #{keyword}, '%') ESCAPE '!') </if>"
             + "<if test='status != null'>"

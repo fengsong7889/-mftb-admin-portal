@@ -14,6 +14,7 @@ import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 
 /** CPM 进度流水访问：只追加；读取都是「某人某期间」的轨迹取数。 */
@@ -29,11 +30,27 @@ public interface CpmItemUpdateMapper extends BaseMapper<CpmItemUpdate> {
     List<CpmItemUpdate> listByItemInRange(@Param("itemId") long itemId,
                                           @Param("start") LocalDate start, @Param("end") LocalDate end);
 
-    /** 与窗口查询同条件的总数，用于如实返回 truncated。 */
-    @Select("SELECT COUNT(*) FROM biz_cpm_item_update WHERE item_id = #{itemId} "
-            + "AND update_date >= #{start} AND update_date <= #{end}")
-    int countByItemInRange(@Param("itemId") long itemId,
-                           @Param("start") LocalDate start, @Param("end") LocalDate end);
+    /** 单任务总流水数：用于判断 400 天窗口是否确实省略了更早记录。 */
+    @Select("SELECT COUNT(*) FROM biz_cpm_item_update WHERE item_id = #{itemId}")
+    int countByItem(@Param("itemId") long itemId);
+
+    /**
+     * 台账快照边界点：每条任务最多取 1 行。
+     *
+     * <p>{@code date=null} 取全历史最新一笔；否则取不晚于该日的最后一笔。
+     * 服务层分别取全历史、期初、期末三个边界即可还原快照，不必把 400 天流水全拉回内存。
+     */
+    @Select("<script>SELECT u.* FROM biz_cpm_item_update u JOIN biz_cpm_item i ON i.id = u.item_id "
+            + "WHERE i.user_id = #{userId} AND i.deleted = 0 "
+            + "AND u.item_id IN <foreach collection='itemIds' item='id' open='(' separator=',' close=')'>#{id}</foreach> "
+            + "<if test='date != null'>AND u.update_date &lt;= #{date}</if> "
+            + "AND NOT EXISTS (SELECT 1 FROM biz_cpm_item_update n WHERE n.item_id = u.item_id "
+            + "<if test='date != null'>AND n.update_date &lt;= #{date}</if> "
+            + "AND (n.update_date &gt; u.update_date OR (n.update_date = u.update_date AND n.id &gt; u.id))) "
+            + "</script>")
+    List<CpmItemUpdate> listLatestPerItem(@Param("userId") long userId,
+                                          @Param("itemIds") Collection<Long> itemIds,
+                                          @Param("date") LocalDate date);
 
     /** 期间内该用户全部条目流水（周报聚合轨迹来源，一次取全避免 N+1）。 */
     @Select("SELECT u.* FROM biz_cpm_item_update u JOIN biz_cpm_item i ON i.id = u.item_id "

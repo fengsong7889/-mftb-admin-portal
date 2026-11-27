@@ -33,6 +33,7 @@ public class CpmSchemaContracts implements SchemaContractProvider {
         list.add(worklogGroupContract());
         list.add(workCalendarContract());
         list.add(worklogMarksContract());
+        list.add(worklogCapacityIndexContract());
         return list;
     }
 
@@ -210,5 +211,25 @@ public class CpmSchemaContracts implements SchemaContractProvider {
                         new ContractSpec.ColumnSpec("cancel_reason",
                                 "ALTER TABLE biz_cpm_item ADD COLUMN cancel_reason VARCHAR(200) NULL"
                                         + " COMMENT '人工取消原因（会议来源取消为空，由 source_type 区分）'")));
+    }
+
+    /**
+     * biz_cpm_item 容量窗口与归档游标索引（cpm:schema:v1.6）。
+     * <p>索引缺失不会报语法错，但会让窗口/归档查询随用户历史量放大扫描；
+     * 因此必须和列一样进入启动契约，缺索引时按同一份 DDL 自愈。
+     */
+    private ContractSpec worklogCapacityIndexContract() {
+        return new ContractSpec(
+                "cpm-worklog-capacity-indexes",
+                "biz_cpm_item",
+                null,
+                List.of(),
+                List.of(
+                        new ContractSpec.IndexSpec("idx_cpm_item_user_deleted_status_updated",
+                                "ALTER TABLE biz_cpm_item ADD INDEX idx_cpm_item_user_deleted_status_updated "
+                                        + "(user_id, deleted, status, updated_at)"),
+                        new ContractSpec.IndexSpec("idx_cpm_item_user_deleted_plan_start",
+                                "ALTER TABLE biz_cpm_item ADD INDEX idx_cpm_item_user_deleted_plan_start "
+                                        + "(user_id, deleted, plan_start, work_date, id)")));
     }
 }

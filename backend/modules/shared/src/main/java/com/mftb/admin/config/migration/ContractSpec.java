@@ -9,19 +9,33 @@ import java.util.List;
  * <ul>
  *   <li>表不存在：若提供了 {@code createTableIfMissing} 则执行它，否则视为无法自愈的漂移。</li>
  *   <li>列不存在：若对应 {@link ColumnSpec#addColumnDdl()} 非空则执行补列，否则视为漂移。</li>
+ *   <li>索引不存在：若对应 {@link IndexSpec#addIndexDdl()} 非空则执行补索引，否则视为漂移。</li>
  * </ul>
- * 契约只声明“必需存在”的列，允许生产表存在额外历史列；不比对逐字类型，避免误 ALTER。
+ * 契约只声明“必需存在”的列与索引，允许生产表存在额外历史列；不比对逐字类型，避免误 ALTER。
  */
 public record ContractSpec(
         String name,
         String table,
         String createTableIfMissing,
-        List<ColumnSpec> requiredColumns) {
+        List<ColumnSpec> requiredColumns,
+        List<IndexSpec> requiredIndexes) {
+
+    /** 兼容既有只声明列的契约；索引清单缺省为空。 */
+    public ContractSpec(String name, String table, String createTableIfMissing, List<ColumnSpec> requiredColumns) {
+        this(name, table, createTableIfMissing, requiredColumns, List.of());
+    }
 
     /** 必需列：列名 + 可安全执行的补列 DDL（为空表示该列缺失时不可自愈）。 */
     public record ColumnSpec(String column, String addColumnDdl) {
         public boolean healable() {
             return addColumnDdl != null && !addColumnDdl.isBlank();
+        }
+    }
+
+    /** 必需索引：索引名 + 可安全执行的补索引 DDL（为空表示缺失时不可自愈）。 */
+    public record IndexSpec(String index, String addIndexDdl) {
+        public boolean healable() {
+            return addIndexDdl != null && !addIndexDdl.isBlank();
         }
     }
 }

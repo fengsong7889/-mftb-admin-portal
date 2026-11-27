@@ -18388,6 +18388,7 @@
         "fileBase": "MyWorkLog_{{date}}",
         "imageDone": "Downloaded the long-image snapshot of the current ledger",
         "pdfDone": "Downloaded the A4 paginated PDF of the current ledger",
+        "scopeLoaded": "Exporting only the {{loaded}} loaded items",
         "titleAll": "All ({{start}} ~ {{end}})"
       },
       "hours": {
@@ -18556,6 +18557,7 @@
         "percent": "%"
       },
       "capacity": {
+        "loaded": "Loaded {{loaded}} of {{matching}} in this query",
         "truncated": "Loaded {{loaded}} of {{matching}} items in this query",
         "truncatedDesc": "Only the most recent records are loaded to keep the page responsive. Narrow the date range or open the earlier archive.",
         "openArchive": "View earlier archive"
@@ -18569,6 +18571,7 @@
         "hasArchive": "{{count}} earlier archived items"
       },
       "archive": {
+        "backToLedger": "Back to ledger",
         "title": "Earlier Archived Records",
         "loadFailed": "Failed to load the earlier archive",
         "summary": "Loaded {{loaded}} of {{matching}} archived items",

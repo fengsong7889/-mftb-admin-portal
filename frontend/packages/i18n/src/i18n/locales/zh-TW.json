@@ -18360,6 +18360,7 @@
         "fileBase": "我的工作記錄_{{date}}",
         "imageDone": "已下載當前台账的長圖快照",
         "pdfDone": "已下載當前台账的 A4 分頁 PDF",
+        "scopeLoaded": "僅匯出當前已載入 {{loaded}} 條",
         "titleAll": "全部（{{start}} ~ {{end}}）"
       },
       "hours": {
@@ -18528,6 +18529,7 @@
         "percent": "%"
       },
       "capacity": {
+        "loaded": "已載入 {{loaded}} / 當前查詢共 {{matching}}",
         "truncated": "目前載入 {{loaded}} 條，當前查詢共 {{matching}} 條",
         "truncatedDesc": "為保持頁面流暢，單次只載入最近記錄。請縮小時間範圍，或查看更早歸檔。",
         "openArchive": "查看更早歸檔"
@@ -18541,6 +18543,7 @@
         "hasArchive": "另有 {{count}} 筆更早歸檔"
       },
       "archive": {
+        "backToLedger": "返回台账",
         "title": "更早歸檔記錄",
         "loadFailed": "更早歸檔載入失敗",
         "summary": "已載入 {{loaded}} 條 · 更早歸檔共 {{matching}} 條",

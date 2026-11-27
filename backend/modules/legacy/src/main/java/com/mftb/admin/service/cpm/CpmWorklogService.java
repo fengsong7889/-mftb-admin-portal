@@ -111,17 +111,6 @@ public class CpmWorklogService {
 
         LocalDate readFrom = from != null ? from : currentPeriodAnchor().minusDays(READ_BACK_DAYS);
         LocalDate readTo = to != null ? to : currentPeriodAnchor();
-        /**
-         * 进度流水的读取窗口与查询窗口解耦。
-         *
-         * <p>流水在台账里有两个消费者，它们要的区间不是一个东西：汇报的期初/期末快照要的是
-         * 「本期收在哪里」（必须跟查询窗口，否则周报数字会跟着筛选档飘）；而进度弹层里的
-         * 逐周轨迹要的是「这条子任务从开始到现在推过几次」。两者共用查询窗口时，默认的
-         * 「本週」档会把历史剪成一期——用户看到的不是「这周推了多少」，而是「只有本周」，
-         * 那个功能就白做了。日历仍按 readFrom/readTo 取（工时口径属于本期）。
-         */
-        LocalDate historyFrom = currentPeriodAnchor().minusDays(READ_BACK_DAYS);
-        LocalDate historyTo = currentPeriodAnchor();
         CpmWorkdays.Ledger calendar = workdays.load(current.getId(), readFrom, readTo);
 
         List<CpmItem> items = new ArrayList<>(itemMapper.listLedgerWindow(current.getId(), windowStart, from, to,
@@ -143,7 +132,7 @@ public class CpmWorklogService {
                 byGroup.computeIfAbsent(item.getGroupId(), k -> new ArrayList<>()).add(item);
             }
         }
-        Map<Long, List<CpmWorklogDto.HistoryVO>> trails = trails(current.getId(), historyFrom, historyTo);
+        Map<Long, List<CpmWorklogDto.HistoryVO>> trails = snapshotTrails(current.getId(), items, from, to);
         CpmWorklogDto.LedgerVO vo = new CpmWorklogDto.LedgerVO();
         vo.setRangeStart(from == null ? null : from.toString());
         vo.setRangeEnd(to == null ? null : to.toString());
@@ -241,6 +230,10 @@ public class CpmWorklogService {
             CpmItem last = rows.get(rows.size() - 1);
             vo.setNextCursorDate(ledgerDateOf(last).toString());
             vo.setNextCursorId(last.getId());
+            CpmWorklogDto.ArchiveCursorVO cursor = new CpmWorklogDto.ArchiveCursorVO();
+            cursor.setDate(vo.getNextCursorDate());
+            cursor.setId(vo.getNextCursorId());
+            vo.setArchiveCursor(cursor);
         }
         return vo;
     }
@@ -252,11 +245,11 @@ public class CpmWorklogService {
         LocalDate to = currentPeriodAnchor();
         LocalDate from = to.minusDays(READ_BACK_DAYS);
         List<CpmItemUpdate> rows = updateMapper.listByItemInRange(id, from, to);
-        int matching = updateMapper.countByItemInRange(id, from, to);
+        int total = updateMapper.countByItem(id);
         CpmWorklogDto.HistoryPageVO vo = new CpmWorklogDto.HistoryPageVO();
         vo.setHistory(rows.stream().map(row -> new CpmWorklogDto.HistoryVO(
                 row.getUpdateDate().toString(), row.getProgress() == null ? 0 : row.getProgress())).toList());
-        vo.setTruncated(matching > rows.size());
+        vo.setTruncated(total > rows.size());
         return vo;
     }
 
@@ -743,13 +736,33 @@ public class CpmWorklogService {
         dates.stream().filter(d -> d != null && !d.isBlank()).forEach(d -> map.putIfAbsent(d, type));
     }
 
-    private Map<Long, List<CpmWorklogDto.HistoryVO>> trails(long userId, LocalDate from, LocalDate to) {
+    /**
+     * 台账快照边界点：全历史最新、期初前最后一笔、期末前最后一笔，每条任务最多 3 行。
+     *
+     * <p>列表响应仍不携带 history；这些点只供服务端还原 periodStart/periodProgress/kind/latestAt。
+     * 打开进度弹层时才走单任务 400 天历史接口，避免一次加载全部流水。
+     */
+    private Map<Long, List<CpmWorklogDto.HistoryVO>> snapshotTrails(long userId, List<CpmItem> items,
+                                                                   LocalDate from, LocalDate to) {
         Map<Long, List<CpmWorklogDto.HistoryVO>> map = new LinkedHashMap<>();
-        updateMapper.listByUserAndRange(userId, from, to).forEach(row -> map
-                .computeIfAbsent(row.getItemId(), k -> new ArrayList<>())
+        if (items.isEmpty()) {
+            return map;
+        }
+        List<Long> itemIds = items.stream().map(CpmItem::getId).filter(Objects::nonNull).distinct().toList();
+        addSnapshotPoints(map, updateMapper.listLatestPerItem(userId, itemIds, null));
+        if (from != null) {
+            addSnapshotPoints(map, updateMapper.listLatestPerItem(userId, itemIds, from));
+        }
+        if (to != null) {
+            addSnapshotPoints(map, updateMapper.listLatestPerItem(userId, itemIds, to));
+        }
+        return map;
+    }
+
+    private void addSnapshotPoints(Map<Long, List<CpmWorklogDto.HistoryVO>> map, List<CpmItemUpdate> rows) {
+        rows.forEach(row -> map.computeIfAbsent(row.getItemId(), k -> new ArrayList<>())
                 .add(new CpmWorklogDto.HistoryVO(row.getUpdateDate().toString(),
                         row.getProgress() == null ? 0 : row.getProgress())));
-        return map;
     }
 
     private CpmWorklogDto.GroupVO toGroupVO(CpmWorklogGroup group, List<CpmItem> tasks,

@@ -904,6 +904,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 8px;
   min-height: 36px;
   margin-top: 12px;
   font-size: 12px;
@@ -1155,6 +1156,12 @@
   align-items: center;
   gap: 10px;
   min-width: 0;
+}
+.wg-capacity {
+  color: var(--text-3);
+  font-size: 11px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 .wg-list-state {
   display: inline-flex;

@@ -318,12 +318,13 @@ export default function WorklogGantt() {
     try {
       const res = await fetchLedger(ledgerQuery)
       setData(res.data)
+      const loaded = res.loadedTaskCount ?? res.data.groups.reduce((sum, g) => sum + g.tasks.length, 0)
       setCapacity({
-        loadedTaskCount: res.loadedTaskCount,
-        matchingTaskCount: res.matchingTaskCount,
-        truncated: res.truncated,
-        hasEarlierArchive: res.hasEarlierArchive,
-        earlierArchiveCount: res.earlierArchiveCount,
+        loadedTaskCount: loaded,
+        matchingTaskCount: res.matchingTaskCount ?? loaded,
+        truncated: res.truncated ?? false,
+        hasEarlierArchive: res.hasEarlierArchive ?? false,
+        earlierArchiveCount: res.earlierArchiveCount ?? 0,
       })
       setLoadError(null)
       if (res.data.groups.length === 0) {
@@ -923,10 +924,10 @@ export default function WorklogGantt() {
   }
   /* 截斷時導出只覆蓋已載入窗口：選單頂部用分組標題把範圍說清楚，
      否則拿到文件的人會把「最近 2000 條」誤讀成全量（二期才接服務端全量導出） */
-  const exportScopeNote = capacity.truncated
-    ? t('cpm.gantt.capacity.truncated', {
-        loaded: capacity.loadedTaskCount, matching: capacity.matchingTaskCount,
-        defaultValue: '目前載入 {{loaded}} 條，當前查詢共 {{matching}} 條',
+  const exportScopeNote = capacity.truncated || capacity.hasEarlierArchive
+    ? t('cpm.gantt.export.scopeLoaded', {
+        loaded: capacity.loadedTaskCount,
+        defaultValue: '僅匯出當前已載入 {{loaded}} 條',
       })
     : null
   const exportEntries: MenuProps['items'] = [
@@ -1468,6 +1469,12 @@ export default function WorklogGantt() {
               </span>
             </span>
             <span className="wg-tabbar__right">
+              <span className="wg-capacity">
+                {t('cpm.gantt.capacity.loaded', {
+                  loaded: capacity.loadedTaskCount, matching: capacity.matchingTaskCount,
+                  defaultValue: '已載入 {{loaded}} / 當前查詢共 {{matching}}',
+                })}
+              </span>
               <span>
                 {t('cpm.gantt.tabbar.summary', {
                   tasks: stats.total, workdays: visibleDays.filter(d => !d.rest).length,

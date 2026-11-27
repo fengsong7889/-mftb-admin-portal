@@ -115,4 +115,20 @@ class SchemaContractValidatorTest {
         verify(jdbc, times(1)).execute(contains("CREATE TABLE IF NOT EXISTS t_test"));
         assertTrue(readiness.isReady());
     }
+
+    @Test
+    void selfHealsMissingIndexThenMarksReady() {
+        ContractSpec withIndex = new ContractSpec("i-test", "t_test", null, List.of(),
+                List.of(new ContractSpec.IndexSpec("idx_test",
+                        "ALTER TABLE t_test ADD INDEX idx_test (id)")));
+        when(registry.allContracts()).thenReturn(List.of(withIndex));
+        when(jdbc.queryForObject(anyString(), eq(Integer.class), eq("t_test"))).thenReturn(1);
+        when(jdbc.queryForObject(anyString(), eq(Integer.class), eq("t_test"), eq("idx_test")))
+                .thenReturn(0, 1);
+
+        validator.run();
+
+        verify(jdbc, times(1)).execute(contains("ADD INDEX idx_test"));
+        assertTrue(readiness.isReady(), "自愈索引成功后应置就绪");
+    }
 }

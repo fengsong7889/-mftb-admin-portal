@@ -259,9 +259,15 @@ describe('统一工作记录视图', () => {
       mount()
       await screen.findByText('銷售定價-門店')
       expect(screen.getByText(/目前載入 6 條，當前查詢共 2500 條/)).toBeTruthy()
+      expect(screen.getByText('已載入 6 / 當前查詢共 2500')).toBeTruthy()
       expect(screen.getByText('另有 500 筆更早歸檔')).toBeTruthy()
       // 截斷橫幅與底部結束帶各有一個歸檔入口：同名按鈕有兩個是刻意設計，不能用 getByRole 單命中
       expect(screen.getAllByRole('button', { name: /查看更早歸檔/ })).toHaveLength(2)
+      // 前一用例遗留的确认弹窗会遮住底层按钮；先关闭，再验证导出菜单的范围提示
+      const cancel = screen.queryByRole('button', { name: '取 消' })
+      if (cancel) await userEvent.setup().click(cancel)
+      await userEvent.setup().click(screen.getByRole('button', { name: /導出/ }))
+      expect(await screen.findByText('僅匯出當前已載入 6 條')).toBeTruthy()
     } finally {
       if (original) fetchMock.mockImplementation(original)
     }

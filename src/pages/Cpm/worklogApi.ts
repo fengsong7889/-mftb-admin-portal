@@ -83,6 +83,7 @@ interface LedgerDTO {
   truncated?: boolean
   hasEarlierArchive?: boolean
   earlierArchiveCount?: number
+  archiveCursor?: { date: string; id: number } | null
   nextCursorDate?: string | null
   nextCursorId?: number | null
 }
@@ -163,6 +164,7 @@ export interface LedgerResult extends LedgerCapacityMeta {
 
 export interface ArchiveResult extends LedgerCapacityMeta {
   groups: GanttGroup[]
+  archiveCursor?: { date: string; id: number } | null
   nextCursorDate: string | null
   nextCursorId: number | null
 }
@@ -207,8 +209,9 @@ export async function fetchLedgerArchive(query: LedgerQuery, cursorDate?: string
   return {
     groups,
     ...ledgerCapacity(dto, groups),
-    nextCursorDate: dto.nextCursorDate ?? null,
-    nextCursorId: dto.nextCursorId ?? null,
+    archiveCursor: dto.archiveCursor ?? null,
+    nextCursorDate: dto.nextCursorDate ?? dto.archiveCursor?.date ?? null,
+    nextCursorId: dto.nextCursorId ?? dto.archiveCursor?.id ?? null,
   }
 }
 

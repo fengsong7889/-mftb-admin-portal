@@ -40,14 +40,15 @@ function archivePage(first: boolean) {
     truncated: first,
     hasEarlierArchive: true,
     earlierArchiveCount: 150,
+    archiveCursor: first ? { date: '2025-01-01', id: 100 } : null,
     nextCursorDate: first ? '2025-01-01' : null,
     nextCursorId: first ? 100 : null,
   }
 }
 
-function mount() {
+function mount(onClose = () => undefined) {
   return render(<I18nextProvider i18n={i18n}>
-    <WorklogArchiveDrawer open query={{ keyword: '測試' }} onClose={() => undefined} />
+    <WorklogArchiveDrawer open query={{ keyword: '測試' }} onClose={onClose} />
   </I18nextProvider>)
 }
 
@@ -72,5 +73,15 @@ describe('更早归档抽屉', () => {
     expect(ledgerApi.fetchLedgerArchive).toHaveBeenLastCalledWith({ keyword: '測試' }, '2025-01-01', 100)
     expect(screen.getByText('已載入 150 條 · 更早歸檔共 150 條')).toBeTruthy()
     expect(screen.getByText('更早歸檔已全部載入（150 條）')).toBeTruthy()
+  })
+
+  it('归档只读，并提供返回台账入口', async () => {
+    const onClose = vi.fn()
+    vi.mocked(ledgerApi.fetchLedgerArchive).mockResolvedValueOnce(archivePage(false) as never)
+    mount(onClose)
+    await screen.findByText('歸檔100')
+    expect(screen.queryByRole('button', { name: /編輯|刪除|恢復/ })).toBeNull()
+    await userEvent.setup().click(screen.getByRole('button', { name: '返回台账' }))
+    expect(onClose).toHaveBeenCalledTimes(1)
   })
 })
