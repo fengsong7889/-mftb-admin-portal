@@ -15,6 +15,7 @@ import com.mftb.admin.mapper.SysVersionHistoryMapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -195,6 +196,19 @@ class VersionHistoryRenumberTest {
                 .thenReturn(List.of(record(1, "1.0.99.00", "minor")));
 
         assertEquals("1.1.0.00", service.suggestNextVersion("minor"));
+    }
+
+    @Test
+    @DisplayName("新增时 null 概览归一为空字符串，兼容 TEXT NOT NULL 且不依赖旧默认值")
+    void createNormalizesNullSummary() {
+        VersionHistoryVO vo = new VersionHistoryVO();
+        vo.setVersionNo("1.0.1.00");
+
+        service.create(vo, "admin");
+
+        ArgumentCaptor<SysVersionHistory> captor = ArgumentCaptor.forClass(SysVersionHistory.class);
+        verify(mapper).insert(captor.capture());
+        assertEquals("", captor.getValue().getSummary());
     }
 
     @Test

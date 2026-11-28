@@ -195,7 +195,8 @@ public class VersionHistoryServiceImpl implements VersionHistoryService {
         entity.setVersionNo(vo.getVersionNo());
         entity.setReleaseDate(vo.getReleaseDate());
         entity.setReleaseType(vo.getReleaseType());
-        entity.setSummary(vo.getSummary());
+        // TEXT NOT NULL 不再依赖 VARCHAR 时代的默认值；空概览统一落空字符串，避免旧调用方传 null 时撞约束。
+        entity.setSummary(vo.getSummary() == null ? "" : vo.getSummary());
         entity.setFrontendChanges(vo.getFrontendChanges());
         entity.setBackendChanges(vo.getBackendChanges());
         entity.setDatabaseChanges(vo.getDatabaseChanges());

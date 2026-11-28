@@ -23,7 +23,7 @@ export const MENU_NAME_EN: Record<string, string> = {
   'gift-detail': 'Promotion Gifts',
   'gift-consume-detail': 'Consumption Details',
   'ad-sales': 'Ad Sales',
-  'promotion-word-library': 'Algorithm Recommendation Library',
+  'promotion-word-library': 'Recommendation Algorithm Library',
   // 流量沙盤
   'traffic-sandbox': 'Experiment Sandbox',
   'waterfall-simulation': 'Waterfall Simulation',

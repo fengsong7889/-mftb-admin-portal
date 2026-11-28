@@ -163,6 +163,67 @@
       "status": "ACTIVE"
     },
     {
+      "versionKey": "version_history:98_version_history.sql:v1",
+      "module": "version-history",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "versionHistoryDataInitializer",
+      "status": "ACTIVE",
+      "scriptFiles": [
+        "98_version_history.sql"
+      ],
+      "intent": "版本发布历史表底座与初始版本记录",
+      "comment": "补登记既有初始化键；CREATE TABLE IF NOT EXISTS + INSERT IGNORE 可重入，后置校验表存在。"
+    },
+    {
+      "versionKey": "version_history:109_version_history_commit_hash.sql:v1",
+      "module": "version-history",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "versionHistoryDataInitializer",
+      "status": "ACTIVE",
+      "dependencies": [
+        "version_history:98_version_history.sql:v1"
+      ],
+      "scriptFiles": [
+        "109_version_history_commit_hash.sql"
+      ],
+      "intent": "版本同步增量游标 commit_hash",
+      "comment": "先查 information_schema 再补列，避免 MySQL 不支持 ADD COLUMN IF NOT EXISTS；后置校验列存在。"
+    },
+    {
+      "versionKey": "version_history:110_version_history_summary_len.sql:v1",
+      "module": "version-history",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "versionHistoryDataInitializer",
+      "status": "ACTIVE",
+      "dependencies": [
+        "version_history:109_version_history_commit_hash.sql:v1"
+      ],
+      "scriptFiles": [
+        "110_version_history_summary_len.sql"
+      ],
+      "intent": "版本概要从 500 扩到 2000 的历史迁移",
+      "comment": "保留历史版本键不重写已应用迁移；已是 TEXT 的库跳过，避免反向缩窄。"
+    },
+    {
+      "versionKey": "version_history:summary-text-v1.0",
+      "module": "version-history",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "versionHistoryDataInitializer",
+      "status": "ACTIVE",
+      "dependencies": [
+        "version_history:110_version_history_summary_len.sql:v1"
+      ],
+      "scriptFiles": [
+        "348_version_history_summary_text.sql"
+      ],
+      "intent": "版本概要改 TEXT，根治 Git 同步按天拼接长提交列表触发 Data truncation",
+      "comment": "2026-11-27 生产事故：11-05 与 11-06 的日提交标题分别约 2580/4003 字符，超过 VARCHAR(2000)。迁移只放宽不删数据，后置实查 DATA_TYPE 为 text/mediumtext 才记版本；backend/sql 下 348 为逐字参考副本。"
+    },
+    {
       "versionKey": "biz:store-category-v1.0",
       "module": "biz",
       "phase": "MODULE_STRUCTURE",
@@ -4241,6 +4302,24 @@
       "intent": "「詞庫管理」更名為「算法推薦詞庫」：菜單名帶上歸屬，不再與搜索運營系統的「搜索詞庫」混淆",
       "author": "Qoder",
       "comment": "本菜單在「商家推廣工具」下供算法推薦取詞，與搜索側的分詞/同義/熱搜/停用四庫分屬兩套；原名不帶歸屬，用戶在界面裡會讀成搜索詞庫。種子側同步改成新名（新庫直接寫新值），存量庫靠本條收斂：seedSystemMenus 只新增不覆蓋存量 name，seedMenuEnglishNames 也只填 NULL/空值，改種子對已跑過的環境無效。守衛：UPDATE 帶舊默認名作條件（name_en 額外接管 NULL/空值與歷史默認名 Word Library），運營自定義過的名稱不命中；命中 0 行屬正常幂等。除 sys_menu 外還必須改 sys_translation 的 menu.promotion-word-library 行：TranslationDataInitializer.syncMenuNames 僅「插入不存在」的菜單行、從不更新已有行，而簡中/日/韓/俄界面取菜單名走的是 bundle 裡的 menu.* 鍵（見前端 translateMenuName），不改這一行則後端菜單表改了名、側邊欄仍顯示舊名。該行只改 zh-TW/en 兩個值，其餘語言整鍵刪除，交給同一啟動鏈裡的 backfillZhCn（只補空缺）與自動機翻重新補齊——寫空串會讓 i18next 認為「該語言有值」而不再回落，反而顯示空白。menu_key 不變，權限矩陣/路由/列配置/埋點不需要同步。後置校驗只斷言「仍是歷史默認名的行已不存在」，不斷言等於新名，否則運營自定義過名稱的環境會被 verify 判失敗並無限重試。參考 SQL: sql/345_promotion_word_library_menu_rename.sql"
+    },
+    {
+      "versionKey": "ads:promotion-word-library-menu-rename-v2",
+      "module": "ads",
+      "phase": "MENU_SEED",
+      "executionType": "JAVA",
+      "executor": "dataInitializer",
+      "status": "ACTIVE",
+      "dependencies": [
+        "core:menu-seed-v46",
+        "ads:promotion-word-library-menu-rename-v1"
+      ],
+      "scriptFiles": [
+        "349_promotion_word_library_menu_word_order.sql"
+      ],
+      "intent": "「算法推薦詞庫」更名為「推薦算法詞庫」：統一菜單名詞序，不改菜單鍵與權限",
+      "author": "Qoder",
+      "comment": "345 已記成功的環境不會重跑，因此本條使用獨立版本鍵，將上一版默認名收斂為產品定版的「推薦算法詞庫」。守衛與 345 一致：只更新 name 仍等於「算法推薦詞庫」的行，name_en 額外接管 NULL/空串與歷史默認名 Algorithm Recommendation Library；運營在菜單配置裡自定義過的名稱不命中。命中後同步 sys_translation.menu.promotion-word-library 的 zh-TW/en，移除 zh-CN/ja/ko/ru 舊值交給啟動期回填與機翻，避免側邊欄繼續顯示舊菜單名。後置校驗只確認菜單存在且不再等於上一版默認名，保留運營自定義名稱。menu_key、路由、權限矩陣、父子層級與排序均不變。參考 SQL: sql/349_promotion_word_library_menu_word_order.sql"
     },
     {
       "versionKey": "organic:retire-plt02a-v1",

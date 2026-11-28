@@ -431,7 +431,7 @@ const MENU_TREE: RdmMenuTreeNode[] = [
       { key: 'hot-search-library', title: '熱搜詞庫' },
       { key: 'synonym-config', title: '同義詞配置' },
       { key: 'hint-config', title: '引導詞配置' },
-      { key: 'promotion-word-library', title: '算法推薦詞庫' },
+      { key: 'promotion-word-library', title: '推薦算法詞庫' },
     ],
   },
   {

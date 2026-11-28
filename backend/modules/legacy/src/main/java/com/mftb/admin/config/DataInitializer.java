@@ -135,10 +135,13 @@ public class DataInitializer implements CommandLineRunner {
     // v45: 退役「拆分系统前的一级包装目录」——12 个壳菜单不再种子化，其子菜单直接挂顶级（见 RETIRED_SYSTEM_WRAPPERS）。
     private static final String V_MENU_SEED = "core:menu-seed-v46";
 
-    /** 「商家推廣工具 > 詞庫管理」定版菜单名（345 改名）：种子、存量迁移、后置校验三处必须同源，避免写错一个字导致迁移命中 0 行 */
-    private static final String MENU_ALGO_WORD_LIBRARY_NAME = "算法推薦詞庫";
-    private static final String MENU_ALGO_WORD_LIBRARY_NAME_EN = "Algorithm Recommendation Library";
-    /** 改名前的历史默认名，只用于迁移守卫与校验，不得拿来做业务判定 */
+    /** 「商家推廣工具 > 推薦算法詞庫」定版菜单名（345 初改、349 调整词序）：种子、存量迁移、后置校验必须同源 */
+    private static final String MENU_ALGO_WORD_LIBRARY_NAME = "推薦算法詞庫";
+    private static final String MENU_ALGO_WORD_LIBRARY_NAME_EN = "Recommendation Algorithm Library";
+    /** 345 后的历史默认名，只用于 349 迁移守卫与校验，不得拿来做业务判定 */
+    private static final String MENU_WORD_LIBRARY_RENAMED_NAME = "算法推薦詞庫";
+    private static final String MENU_WORD_LIBRARY_RENAMED_NAME_EN = "Algorithm Recommendation Library";
+    /** 345 前的历史默认名，只用于迁移守卫与校验，不得拿来做业务判定 */
     private static final String MENU_WORD_LIBRARY_OLD_NAME = "詞庫管理";
     private static final String MENU_WORD_LIBRARY_OLD_NAME_EN = "Word Library";
     
@@ -219,10 +222,14 @@ public class DataInitializer implements CommandLineRunner {
         versionTracker.applyOnce("ads:merchant-score-menu-first-v1", this::moveMerchantScoreInsightMenuFirst);
         // 326: 「商家權重分排名」→「商家權重分」。菜单名只留实体名、不带页面后缀；同样因种子只增不改存量名称，用一次性迁移收敛。
         versionTracker.applyOnce("ads:merchant-score-menu-rename-v2", this::renameMerchantScoreInsightMenuV2);
-        // 345: 「詞庫管理」→「算法推薦詞庫」。本菜单是算法推荐用的词库，与搜索运营系统的「搜索詞庫」不是一回事，
-        //      原名不带归属容易被读成搜索词库；种子只新增不覆盖存量名称、也不覆盖已填的 name_en，故存量库靠一次性迁移收敛。
+        // 345: 「詞庫管理」→「算法推薦詞庫」的历史迁移。本菜单是算法推荐用的词库，与搜索运营系统的「搜索詞庫」不是一回事；
+        //      当前定版名由 349 继续收敛为「推薦算法詞庫」，种子只新增不覆盖存量名称与已填的 name_en。
         versionTracker.applyOnce("ads:promotion-word-library-menu-rename-v1",
                 this::renamePromotionWordLibraryMenu, this::verifyPromotionWordLibraryMenuRename);
+        // 349: 「算法推薦詞庫」→「推薦算法詞庫」。产品统一为「推荐算法 + 词库」的词序；
+        //      345 已记账的环境不会重跑，故用新版本键收敛存量菜单与菜单翻译。
+        versionTracker.applyOnce("ads:promotion-word-library-menu-rename-v2",
+                this::renamePromotionWordLibraryMenuV2, this::verifyPromotionWordLibraryMenuRenameV2);
         // 旧版 JSON 权限迁移必须晚于菜单种子化执行:
         // 否则 resolveMenuId 会为尚未种子的菜单键创建占位菜单(name=menu_key, parent_id=NULL),
         // 被菜单树 buildTree 的孤儿兜底逻辑顶成一级菜单(生产事故: 实验沙盘子菜单顶到一级)
@@ -2480,52 +2487,78 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
      * menu_key 不变，权限矩阵/路由/字段配置都不受影响。参考 SQL: sql/345_promotion_word_library_menu_rename.sql
      */
     private void renamePromotionWordLibraryMenu() {
-        // 只在菜单仍是历史默认名时改名。运营在「菜单配置」里自定义过名称的环境命中 0 行，
-        // 整体跳过（含下方词条同步），避免用默认中英名顶掉运营自己的命名与译文。
+        renameMenuAndSyncTranslations("promotion-word-library",
+                MENU_WORD_LIBRARY_OLD_NAME, MENU_WORD_LIBRARY_RENAMED_NAME,
+                MENU_WORD_LIBRARY_OLD_NAME_EN, MENU_WORD_LIBRARY_RENAMED_NAME_EN);
+    }
+
+    /** 改名后置校验：菜单必须存在且不再是 345 前的历史默认名（运营自定义过的名字也算就绪） */
+    private void verifyPromotionWordLibraryMenuRename() {
+        verifyMenuNameChangedFrom("promotion-word-library", MENU_WORD_LIBRARY_OLD_NAME);
+    }
+
+    /**
+     * 一次性迁移 (349): 「算法推薦詞庫」→「推薦算法詞庫」（英文 Algorithm Recommendation Library
+     * → Recommendation Algorithm Library）。345 已记账的环境不会重跑，必须用独立版本键收敛存量数据。
+     * 参考 SQL: sql/349_promotion_word_library_menu_word_order.sql
+     */
+    private void renamePromotionWordLibraryMenuV2() {
+        renameMenuAndSyncTranslations("promotion-word-library",
+                MENU_WORD_LIBRARY_RENAMED_NAME, MENU_ALGO_WORD_LIBRARY_NAME,
+                MENU_WORD_LIBRARY_RENAMED_NAME_EN, MENU_ALGO_WORD_LIBRARY_NAME_EN);
+    }
+
+    /** 改名后置校验：菜单必须存在且不再是 349 前的默认名（运营自定义过的名字也算就绪） */
+    private void verifyPromotionWordLibraryMenuRenameV2() {
+        verifyMenuNameChangedFrom("promotion-word-library", MENU_WORD_LIBRARY_RENAMED_NAME);
+    }
+
+    /**
+     * 只在菜单仍是历史默认名时改名，并同步菜单翻译；运营自定义名称命中 0 行时整体跳过，
+     * 避免用默认中英名顶掉运营自己的命名与译文。
+     */
+    private void renameMenuAndSyncTranslations(String menuKey, String previousName, String newName,
+                                               String previousNameEn, String newNameEn) {
         int renamed = jdbcTemplate.update(
                 "UPDATE sys_menu SET name = ? WHERE menu_key = ? AND name = ?",
-                MENU_ALGO_WORD_LIBRARY_NAME, "promotion-word-library", MENU_WORD_LIBRARY_OLD_NAME);
+                newName, menuKey, previousName);
         if (renamed == 0) {
             return;
         }
-        // name_en 额外接管 NULL/空值与历史默认名，其它非空值（运营自定义）不覆盖。
         jdbcTemplate.update(
                 "UPDATE sys_menu SET name_en = ? WHERE menu_key = ? AND (name_en IS NULL OR name_en = '' OR name_en = ?)",
-                MENU_ALGO_WORD_LIBRARY_NAME_EN, "promotion-word-library", MENU_WORD_LIBRARY_OLD_NAME_EN);
-        // 菜单名的界面真值是 sys_translation 的 menu.* 行（syncMenuNames 仅插入不更新，不改会一直显示旧名）：
-        // zh-TW/en 直接改成新名，其余语言移除旧键交给启动期的 zh-CN 回填与自动机翻重新补齐，
-        // 而不是在迁移里硬写机翻结果（离线环境拿不到译文；而留空串又会让 i18next 认为「该语言有值」而不回落）。
-        // 逐键改写走 Java 侧而不是 JSON_SET/JSON_REMOVE：避开带连字符的 zh-TW 路径转义，也不依赖库的 JSON 函数行为。
+                newNameEn, menuKey, previousNameEn);
+        // 菜单名的界面真值是 sys_translation 的 menu.* 行（syncMenuNames 仅插入不更新）：
+        // zh-TW/en 直接改成新名，其余语言移除旧键交给启动期的 zh-CN 回填与自动机翻重新补齐。
+        // 逐键改写走 Java 侧而不是 JSON_SET/JSON_REMOVE，避开带连字符的 zh-TW 路径转义。
         List<Map<String, Object>> rows = jdbcTemplate.queryForList(
-                "SELECT id, translations_json FROM sys_translation "
-                        + "WHERE field_key = 'menu.promotion-word-library' AND deleted = 0");
+                "SELECT id, translations_json FROM sys_translation WHERE field_key = ? AND deleted = 0", menuKey);
         for (Map<String, Object> row : rows) {
             Map<String, Object> parsed = JsonUtils.parseMap((String) row.get("translations_json"));
-            // parseMap 解析失败也返回空 Map，不能拿它覆盖存量译文（宁可留旧名下一轮再改，也不能把其它语言洗掉）
+            // parseMap 解析失败也返回空 Map，不能拿它覆盖存量译文，避免把其它语言洗掉。
             if (parsed.isEmpty()) {
-                log.warn("菜单词条 menu.promotion-word-library 的 translations_json 不可解析，本次跳过改名同步");
+                log.warn("菜单词条 menu.{} 的 translations_json 不可解析，本次跳过改名同步", menuKey);
                 continue;
             }
             Map<String, Object> translations = new LinkedHashMap<>(parsed);
-            translations.put("zh-TW", MENU_ALGO_WORD_LIBRARY_NAME);
-            translations.put("en", MENU_ALGO_WORD_LIBRARY_NAME_EN);
+            translations.put("zh-TW", newName);
+            translations.put("en", newNameEn);
             translations.remove("zh-CN");
             translations.remove("ja");
             translations.remove("ko");
             translations.remove("ru");
             jdbcTemplate.update("UPDATE sys_translation SET field_name = ?, translations_json = ?, updated_by = 'system' WHERE id = ?",
-                    MENU_ALGO_WORD_LIBRARY_NAME, JsonUtils.toJson(translations), ((Number) row.get("id")).longValue());
+                    newName, JsonUtils.toJson(translations), ((Number) row.get("id")).longValue());
         }
     }
 
-    /** 改名后置校验：菜单必须存在且不再是历史默认名（运营自定义过的名字也算就绪） */
-    private void verifyPromotionWordLibraryMenuRename() {
-        String name = queryMenuNameByKey("promotion-word-library");
+    private void verifyMenuNameChangedFrom(String menuKey, String previousName) {
+        String name = queryMenuNameByKey(menuKey);
         if (name == null) {
-            throw new IllegalStateException("菜单 promotion-word-library 不存在，改名未生效");
+            throw new IllegalStateException("菜单 " + menuKey + " 不存在，改名未生效");
         }
-        if (MENU_WORD_LIBRARY_OLD_NAME.equals(name)) {
-            throw new IllegalStateException("菜单 promotion-word-library 仍为历史默认名「" + MENU_WORD_LIBRARY_OLD_NAME + "」");
+        if (previousName.equals(name)) {
+            throw new IllegalStateException("菜单 " + menuKey + " 仍为历史默认名「" + previousName + "」");
         }
     }
 
